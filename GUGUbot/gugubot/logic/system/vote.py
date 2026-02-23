@@ -785,8 +785,8 @@ class VoteSystem(BasicSystem):
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
             return
 
-        # 检查是否有足够的合格的投票者
-        if not eligible_voters:
+        # 检查是否有足够的合格的投票者（管理员可以绕过此限制）
+        if not eligible_voters and not broadcast_info.is_admin:
             msg = self.get_tr("no_eligible_voters")
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
             return
@@ -825,9 +825,11 @@ class VoteSystem(BasicSystem):
                 self.debug_log(f"[VoteSystem Debug] 投票后yes_votes: {vote.yes_votes}")
                 self.debug_log(f"[VoteSystem Debug] 投票后no_votes: {vote.no_votes}")
             elif broadcast_info.is_admin:
-                # 管理员绕过：将管理员的 sender_id 临时添加到投票资格中
+                # 管理员绕过：将管理员的 sender_id 临时添加到投票资格中并自动投赞成票
                 self.debug_log(f"[VoteSystem Debug] ✓ 管理员绕过在线限制，直接发起投票并投赞成票: {broadcast_info.sender_id}")
                 vote.eligible_voters.add(broadcast_info.sender_id)
+                success, is_new = vote.cast_vote(broadcast_info.sender_id, True)
+                self.debug_log(f"[VoteSystem Debug] 管理员cast_vote返回值: success={success}, is_new={is_new}")
             else:
                 self.debug_log(f"[VoteSystem Debug] ✗ 发起人无法自动投票")
 
