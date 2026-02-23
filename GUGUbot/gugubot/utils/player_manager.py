@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 # +----------------------------------------------------------------------+
-import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+from mcdreforged.api.types import PluginServerInterface
 
 from gugubot.config import BasicConfig, BotConfig
-from mcdreforged.api.types import PluginServerInterface
+
 
 # +----------------------------------------------------------------------+
 
@@ -83,14 +84,23 @@ class PlayerManager(BasicConfig):
         super().save()
 
     def add_player(
-        self, name: str, player_name: str = None, is_bedrock: bool = False
+            self, name: str, player_name: str = None, is_bedrock: bool = False
     ) -> Player:
         """添加新玩家
 
-        Args:
-            name: str - 玩家名称
-            player_name: str - 玩家名称
-            is_bedrock: bool - 是否为基岩版玩家
+        Parameters
+        ----------
+        name : str
+            玩家名称
+        player_name : str
+            玩家名称
+        is_bedrock : bool
+            是否为基岩版玩家
+
+        Returns
+        -------
+        Player
+            这个玩家对应的 Player 实例
         """
         if name not in self._players:
             self._players[name] = Player(name=name)
@@ -108,26 +118,34 @@ class PlayerManager(BasicConfig):
         return False
 
     def get_player(
-        self, identifier: str, platform: str = None, name_only: bool = False
+            self, identifier: str, platform: str = None, name_only: bool = False
     ) -> Optional[Player]:
         """
         通用的玩家查找函数
 
-        Args:
-            identifier: str - 玩家标识符（可以是名称、UUID或账号ID）
+        Parameters
+        ----------
+        identifier : str
+            玩家标识符（可以是名称、UUID或账号ID）
+        platform : str, optional
+            要查找的平台, 不填或填 ``None`` 在全平台查找
+        name_only : bool, optional
+            是否只用名称查找, 默认 ``False``
+        Returns
+        -------
+        Optional[Player]
+            找到的玩家对象，如果未找到则返回 None
 
-        Returns:
-            Optional[Player] - 找到的玩家对象，如果未找到则返回None
+        Examples
+        --------
+        >>> # 通过名称查找
+        >>> player = manager.get_player("Steve")
 
-        Examples:
-            # 通过名称查找
-            player = manager.get_player("Steve")
+        >>> # 通过UUID查找（Java版或基岩版）
+        >>> player = manager.get_player("uuid-xxxxx")
 
-            # 通过UUID查找（Java版或基岩版）
-            player = manager.get_player("uuid-xxxxx")
-
-            # 通过关联账号查找
-            player = manager.get_player("discord-id")
+        >>> # 通过关联账号查找
+        >>> player = manager.get_player("discord-id")
         """
         # 1. 通过名称查找
         if identifier in self._players:
@@ -155,7 +173,7 @@ class PlayerManager(BasicConfig):
         return list(self._players.values())
 
     def add_player_account(
-        self, identifier: str, platform: str, account_id: str, is_bedrock: bool = False
+            self, identifier: str, platform: str, account_id: str, is_bedrock: bool = False
     ) -> bool:
         """添加玩家关联账号"""
         player = self.get_player(identifier) or self.get_player(
@@ -170,22 +188,27 @@ class PlayerManager(BasicConfig):
         return True
 
     def is_name_bound_by_other_user(
-        self, player_name: str, current_user_id: str, source: str
+            self, player_name: str, current_user_id: str, source: str
     ) -> bool:
         """检查玩家名是否已被其他用户绑定
 
-        Args:
-            player_name: str - 要检查的玩家名
-            current_user_id: str - 当前用户ID
-            source: str - 当前用户来源
-            is_bedrock: bool - 是否为基岩版玩家名
+        Parameters
+        ----------
+        player_name : str
+            要检查的玩家名
+        current_user_id : str
+            当前用户ID
+        source : str
+            当前用户来源
 
-        Returns:
-            bool - 如果已被其他用户绑定则返回True
+        Returns
+        -------
+        bool
+            如果已被其他用户绑定则返回True
         """
         for player in self._players.values():
             player_in_name = (
-                player_name in player.java_name or player_name in player.bedrock_name
+                    player_name in player.java_name or player_name in player.bedrock_name
             )
             not_current_user = current_user_id not in player.accounts.get(source, [])
             platform_not_bound = source in player.accounts
@@ -223,8 +246,8 @@ class PlayerManager(BasicConfig):
                         )
 
                         if (
-                            admin_group_members
-                            and admin_group_members.get("status") == "ok"
+                                admin_group_members
+                                and admin_group_members.get("status") == "ok"
                         ):
                             admin_group_member_ids.update(
                                 [

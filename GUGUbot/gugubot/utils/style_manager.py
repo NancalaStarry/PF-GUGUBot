@@ -18,6 +18,7 @@ try:
 except ImportError:
     import yaml as _yaml
 
+
     class YAMLWrapper:
         @staticmethod
         def load(stream):
@@ -28,6 +29,7 @@ except ImportError:
             return _yaml.safe_dump(
                 data, stream, allow_unicode=True, default_flow_style=False
             )
+
 
     yaml = YAMLWrapper()
 
@@ -56,7 +58,7 @@ class StyleManager:
         ----------
         server : PluginServerInterface
             MCDR 服务器接口
-        config : Optional[BotConfig]
+        config : BotConfig, optional
             配置对象，用于读取和保存当前风格设置
         """
         self.server = server
@@ -114,7 +116,7 @@ class StyleManager:
 
                     # 获取插件包目录中的风格文件
                     with self.server.open_bundled_file(
-                        f"gugubot/constant/{style_file}"
+                            f"gugubot/constant/{style_file}"
                     ) as f:
                         content = f.read().decode("utf-8")
 
@@ -264,7 +266,7 @@ class StyleManager:
             return False, remaining
 
     def set_current_style(
-        self, style_name: str, bypass_cooldown: bool = False
+            self, style_name: str, bypass_cooldown: bool = False
     ) -> Tuple[bool, str, float]:
         """切换当前风格
 

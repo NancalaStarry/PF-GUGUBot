@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """在线玩家列表查询系统。"""
-import re
 import asyncio
+import re
 import time
-from typing import Optional, List, Dict, Any, Tuple
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from mcdreforged.api.types import PluginServerInterface
 
@@ -12,7 +13,7 @@ from gugubot.builder import MessageBuilder
 from gugubot.config.BotConfig import BotConfig
 from gugubot.logic.system.basic_system import BasicSystem
 from gugubot.utils.rcon_manager import RconManager
-from gugubot.utils.types import BoardcastInfo, ProcessedInfo
+from gugubot.utils.types import BroadcastInfo, ProcessedInfo
 
 
 class ListType(Enum):
@@ -27,7 +28,7 @@ class PlayerListSystem(BasicSystem):
     """在线玩家列表系统。"""
 
     def __init__(
-        self, server: PluginServerInterface, config: Optional[BotConfig] = None
+            self, server: PluginServerInterface, config: Optional[BotConfig] = None
     ) -> None:
         super().__init__("list", enable=True, config=config)
         self.server = server
@@ -56,7 +57,7 @@ class PlayerListSystem(BasicSystem):
         return False
 
     def _separate_players_and_bots(
-        self, all_players: List[str]
+            self, all_players: List[str]
     ) -> Tuple[List[str], List[str]]:
         """将玩家列表分离为真实玩家和假人"""
         # 有人绑定 -> 识别假人
@@ -86,27 +87,27 @@ class PlayerListSystem(BasicSystem):
         # 玩家列表触发词
         player_triggers = ["player", "玩家", "在线", "online"]
         if (
-            list_cmd
-            and not list_cmd.startswith("gugubot.")
-            and list_cmd not in player_triggers
+                list_cmd
+                and not list_cmd.startswith("gugubot.")
+                and list_cmd not in player_triggers
         ):
             player_triggers.append(list_cmd)
 
         # 假人列表触发词
         bot_triggers = ["bot", "假人", "机器人"]
         if (
-            bot_cmd
-            and not bot_cmd.startswith("gugubot.")
-            and bot_cmd not in bot_triggers
+                bot_cmd
+                and not bot_cmd.startswith("gugubot.")
+                and bot_cmd not in bot_triggers
         ):
             bot_triggers.append(bot_cmd)
 
         # 服务器状态触发词（显示全部）
         server_triggers = ["server", "服务器", "status", "状态", "all", "全部", "list"]
         if (
-            server_cmd
-            and not server_cmd.startswith("gugubot.")
-            and server_cmd not in server_triggers
+                server_cmd
+                and not server_cmd.startswith("gugubot.")
+                and server_cmd not in server_triggers
         ):
             server_triggers.append(server_cmd)
 
@@ -120,7 +121,7 @@ class PlayerListSystem(BasicSystem):
         return None
 
     async def _reply_to_source(
-        self, boardcast_info: BoardcastInfo, message: List[dict]
+            self, broadcast_info: BroadcastInfo, message: List[dict]
     ) -> None:
         """专用回复方法：只回复到原始消息来源，不转发到 Bridge
 
@@ -128,26 +129,26 @@ class PlayerListSystem(BasicSystem):
         而不会通过 Bridge 转发到其他服务器（如 Minecraft）。
         """
         # 确定回复目标：使用原始来源的连接器名称
-        reply_target = boardcast_info.source.current
+        reply_target = broadcast_info.source.current
 
         # 构造 target
         target_source = (
-            boardcast_info.source_id
-            if boardcast_info.source.origin and str(boardcast_info.source_id).isdigit()
+            broadcast_info.source_id
+            if broadcast_info.source.origin and str(broadcast_info.source_id).isdigit()
             else reply_target
         )
-        target = {target_source: boardcast_info.event_sub_type}
+        target = {target_source: broadcast_info.event_sub_type}
 
         respond = ProcessedInfo(
             processed_message=message,
-            _source=boardcast_info.source,  # 传递完整的 Source 对象
-            source_id=boardcast_info.source_id,
+            _source=broadcast_info.source,  # 传递完整的 Source 对象
+            source_id=broadcast_info.source_id,
             sender=self.system_manager.server.tr("gugubot.bot_name"),
             sender_id=None,
-            raw=boardcast_info.raw,
-            server=boardcast_info.server,
-            logger=boardcast_info.logger,
-            event_sub_type=boardcast_info.event_sub_type,
+            raw=broadcast_info.raw,
+            server=broadcast_info.server,
+            logger=broadcast_info.logger,
+            event_sub_type=broadcast_info.event_sub_type,
             target=target,
         )
 
@@ -155,18 +156,18 @@ class PlayerListSystem(BasicSystem):
             respond, include=[reply_target]
         )
 
-    async def process_boardcast_info(self, boardcast_info: BoardcastInfo) -> bool:
+    async def process_broadcast_info(self, broadcast_info: BroadcastInfo) -> bool:
         # 先检查是否是开启/关闭命令
-        if await self.handle_enable_disable(boardcast_info):
+        if await self.handle_enable_disable(broadcast_info):
             return True
 
         if not self.enable:
             return False
-        
-        if boardcast_info.event_type != "message":
+
+        if broadcast_info.event_type != "message":
             return False
 
-        message = boardcast_info.message
+        message = broadcast_info.message
 
         if not message or message[0].get("type") != "text":
             return False
@@ -178,28 +179,28 @@ class PlayerListSystem(BasicSystem):
 
         # 1. Check for internal bridge response command
         if command.startswith(self.bridge_response_cmd):
-            await self._handle_bridge_response(boardcast_info, command)
+            await self._handle_bridge_response(broadcast_info, command)
             return True
 
         # 2. Check for internal bridge query command
         if command.startswith(self.bridge_query_cmd):
-            await self._handle_bridge_query(boardcast_info, command)
+            await self._handle_bridge_query(broadcast_info, command)
             return True
 
-        if not self.is_command(boardcast_info):
+        if not self.is_command(broadcast_info):
             return False
 
         # 3. Check for normal user command
         list_type = self._get_list_type_from_command(command)
 
         if list_type is not None:
-            await self._handle_user_list_command(boardcast_info, list_type)
+            await self._handle_user_list_command(broadcast_info, list_type)
             return True
 
         return False
 
     async def _handle_user_list_command(
-        self, boardcast_info: BoardcastInfo, list_type: ListType
+            self, broadcast_info: BroadcastInfo, list_type: ListType
     ) -> None:
         """处理用户的玩家列表查询命令"""
         merge_results = self.config.get_keys(
@@ -213,32 +214,32 @@ class PlayerListSystem(BasicSystem):
         )
 
         if merge_results and bridge_enabled and is_main_server:
-            await self._handle_merged_list_command(boardcast_info, list_type)
+            await self._handle_merged_list_command(broadcast_info, list_type)
         else:
-            await self._handle_list_command_local(boardcast_info, list_type)
+            await self._handle_list_command_local(broadcast_info, list_type)
 
             if bridge_enabled and is_main_server:
-                await self._broadcast_query_to_bridge(boardcast_info, list_type)
+                await self._broadcast_query_to_bridge(broadcast_info, list_type)
 
     async def _handle_merged_list_command(
-        self, boardcast_info: BoardcastInfo, list_type: ListType
+            self, broadcast_info: BroadcastInfo, list_type: ListType
     ) -> None:
         """处理合并多服务器结果的列表查询"""
         try:
-            query_id = f"{boardcast_info.sender_id}_{int(time.time() * 1000)}"
+            query_id = f"{broadcast_info.sender_id}_{int(time.time() * 1000)}"
             server_name = self._get_server_name()
 
             real_players, bots = self._get_local_players_and_bots()
 
             self._pending_queries[query_id] = {
-                "boardcast_info": boardcast_info,
+                "broadcast_info": broadcast_info,
                 "list_type": list_type,
                 "responses": {server_name: {"players": real_players, "bots": bots}},
                 "start_time": time.time(),
             }
 
             await self._broadcast_query_to_bridge_with_id(
-                boardcast_info, query_id, list_type
+                broadcast_info, query_id, list_type
             )
 
             timeout = self.config.get_keys(["system", "list", "bridge_timeout"], 3)
@@ -249,7 +250,7 @@ class PlayerListSystem(BasicSystem):
         except Exception as e:
             self.logger.error(f"处理合并列表查询失败: {e}")
             await self._reply_to_source(
-                boardcast_info,
+                broadcast_info,
                 [MessageBuilder.text(self.get_tr("query_failed", error=str(e)))],
             )
 
@@ -288,10 +289,49 @@ class PlayerListSystem(BasicSystem):
             self.logger.warning(f"获取本地假人列表失败: {e}")
         return []
 
+    def _read_server_properties(self) -> Dict[str, str]:
+        """从 MCDR working_directory 中读取 server.properties"""
+        try:
+            working_dir = self.server.get_mcdr_config().get("working_directory", "server")
+            return dict(
+                line.split("=", 1)
+                for line in Path(working_dir, "server.properties")
+                .read_text(encoding="utf-8").splitlines()
+                if "=" in line and not line.startswith("#")
+            )
+        except Exception:
+            return {}
+
+    def _get_players_via_query(self) -> Optional[List[str]]:
+        """使用 mcstatus Query 协议获取玩家列表（绕过 RCON 字节限制）
+
+        自动从 server.properties 读取 server-ip / query.port。
+        需要 enable-query=true 并安装 mcstatus。
+        返回 None 表示查询失败（区别于无在线玩家的 []）。
+        """
+        try:
+            from mcstatus import JavaServer as McStatusServer
+
+            props = self._read_server_properties()
+            host = props.get("server-ip") or "localhost"
+            port = int(props.get("query.port") or props.get("server-port") or 25565)
+            return list(McStatusServer(host, port).query().players.names)
+        except ImportError:
+            self.logger.warning(
+                "mcstatus 未安装，无法使用 Query 协议，请运行: pip install mcstatus"
+            )
+            return None
+        except Exception as e:
+            self.logger.warning(f"Query 协议查询失败: {e}")
+            return None
+
     def _parse_bot_list(self, raw_result: str) -> List[str]:
         """解析 /bot list 返回的假人列表
 
-        格式:
+        使用配置项 system.list.bot_list_pattern 的正则表达式逐行匹配，
+        第一个捕获组作为逗号分隔的假人名列表，不匹配的行自动跳过。
+
+        默认模式 ``\\):\\s*(.+)`` 适配 Carpet 格式:
             Total number: (1/10)
             world_the_end(0):
             world(1): bot1, bot2
@@ -301,23 +341,28 @@ class PlayerListSystem(BasicSystem):
         comma_separator = self.config.get_keys(
             ["system", "list", "comma_separator"], ","
         )
+        bot_list_pattern = self.config.get_keys(
+            ["system", "list", "bot_list_pattern"], r"\):\s*(.+)"
+        )
+
+        try:
+            compiled = re.compile(bot_list_pattern)
+        except re.error as e:
+            self.logger.warning(f"bot_list_pattern 正则编译失败: {e}，使用默认模式")
+            compiled = re.compile(r"\):\s*(.+)")
 
         for line in raw_result.strip().split("\n"):
             line = line.strip()
-            # 跳过总数行和空行
-            if not line or line.startswith("Total number"):
+            if not line:
                 continue
-            # 解析维度行: world(1): bot1, bot2
-            # 查找冒号后的假人列表
-            if "):" in line:
-                parts = line.split("):", 1)
-                if len(parts) == 2 and parts[1].strip():
-                    bot_names = [
-                        b.strip()
-                        for b in re.split(comma_separator, parts[1])
-                        if b.strip()
-                    ]
-                    bots.extend(bot_names)
+            match = compiled.search(line)
+            if match and match.group(1).strip():
+                bot_names = [
+                    b.strip()
+                    for b in re.split(comma_separator, match.group(1))
+                    if b.strip()
+                ]
+                bots.extend(bot_names)
 
         return bots
 
@@ -327,7 +372,21 @@ class PlayerListSystem(BasicSystem):
         Returns:
             Tuple[List[str], List[str]]: (真实玩家列表, 假人列表)
         """
+        use_query = self.config.get_keys(
+            ["system", "list", "use_query_protocol"], False
+        )
         use_bot_list = self.config.get_keys(["system", "list", "use_bot_list"], False)
+
+        if use_query:
+            query_result = self._get_players_via_query()
+            if query_result is not None:
+                if use_bot_list:
+                    bots = self._get_local_bots()
+                    bot_set = set(bots)
+                    real_players = [p for p in query_result if p not in bot_set]
+                    return real_players, bots
+                return self._separate_players_and_bots(query_result)
+            self.logger.warning("Query 协议查询失败，回退到 RCON 查询")
 
         if use_bot_list:
             # leaves/lophine 端：使用 /list 获取玩家，使用 /bot list 获取假人
@@ -347,7 +406,7 @@ class PlayerListSystem(BasicSystem):
         )
 
     async def _handle_bridge_query(
-        self, boardcast_info: BoardcastInfo, command: str
+            self, broadcast_info: BroadcastInfo, command: str
     ) -> None:
         """处理来自 bridge 的查询请求"""
         try:
@@ -362,19 +421,19 @@ class PlayerListSystem(BasicSystem):
                         else ListType.PLAYERS
                     )
                     await self._send_response_to_bridge(
-                        boardcast_info, query_id, list_type
+                        broadcast_info, query_id, list_type
                     )
                     return
 
             # 旧版本行为：直接回复
-            await self._handle_list_command_local(boardcast_info, ListType.PLAYERS)
+            await self._handle_list_command_local(broadcast_info, ListType.PLAYERS)
         except Exception as e:
             self.logger.error(f"处理 bridge 查询失败: {e}")
 
     async def _handle_bridge_response(
-        self, boardcast_info: BoardcastInfo, command: str
+            self, broadcast_info: BroadcastInfo, command: str
     ) -> None:
-        """处理来自其他服务器的响应"""
+        """处理来自其他服务器的响应"""  # broadcast_info 未使用
         try:
             parts = command.split("|")
 
@@ -413,7 +472,7 @@ class PlayerListSystem(BasicSystem):
                 return
 
             query_data = self._pending_queries.pop(query_id)
-            boardcast_info = query_data["boardcast_info"]
+            broadcast_info = query_data["broadcast_info"]
             responses = query_data["responses"]
             list_type = query_data.get("list_type", ListType.PLAYERS)
 
@@ -431,7 +490,7 @@ class PlayerListSystem(BasicSystem):
                 if list_type == ListType.PLAYERS:
                     if players:
                         players.sort()
-                        players_list = [f"  {i+1}. {p}" for i, p in enumerate(players)]
+                        players_list = [f"  {i + 1}. {p}" for i, p in enumerate(players)]
                         result_parts.append(
                             self.get_tr(
                                 "server_players_count",
@@ -448,7 +507,7 @@ class PlayerListSystem(BasicSystem):
                 elif list_type == ListType.BOTS:
                     if bots:
                         bots.sort()
-                        bots_list = [f"  {i+1}. {b}" for i, b in enumerate(bots)]
+                        bots_list = [f"  {i + 1}. {b}" for i, b in enumerate(bots)]
                         result_parts.append(
                             self.get_tr(
                                 "server_bots_count",
@@ -469,7 +528,7 @@ class PlayerListSystem(BasicSystem):
                     if players:
                         players.sort()
                         players_list = [
-                            f"    {i+1}. {p}" for i, p in enumerate(players)
+                            f"    {i + 1}. {p}" for i, p in enumerate(players)
                         ]
                         sub_parts.append(
                             self.get_tr(
@@ -483,7 +542,7 @@ class PlayerListSystem(BasicSystem):
 
                     if bots:
                         bots.sort()
-                        bots_list = [f"    {i+1}. {b}" for i, b in enumerate(bots)]
+                        bots_list = [f"    {i + 1}. {b}" for i, b in enumerate(bots)]
                         sub_parts.append(
                             self.get_tr(
                                 "merged_bots_label",
@@ -500,7 +559,7 @@ class PlayerListSystem(BasicSystem):
             if list_type == ListType.PLAYERS:
                 if total_player_count == 0:
                     await self._reply_to_source(
-                        boardcast_info,
+                        broadcast_info,
                         [MessageBuilder.text(self.get_tr("players_empty"))],
                     )
                 else:
@@ -511,13 +570,13 @@ class PlayerListSystem(BasicSystem):
                         details="\n\n".join(result_parts),
                     )
                     await self._reply_to_source(
-                        boardcast_info, [MessageBuilder.text(merged_message)]
+                        broadcast_info, [MessageBuilder.text(merged_message)]
                     )
 
             elif list_type == ListType.BOTS:
                 if total_bot_count == 0:
                     await self._reply_to_source(
-                        boardcast_info, [MessageBuilder.text(self.get_tr("bots_empty"))]
+                        broadcast_info, [MessageBuilder.text(self.get_tr("bots_empty"))]
                     )
                 else:
                     merged_message = self.get_tr(
@@ -527,14 +586,14 @@ class PlayerListSystem(BasicSystem):
                         details="\n\n".join(result_parts),
                     )
                     await self._reply_to_source(
-                        boardcast_info, [MessageBuilder.text(merged_message)]
+                        broadcast_info, [MessageBuilder.text(merged_message)]
                     )
 
             else:  # ListType.ALL
                 total_count = total_player_count + total_bot_count
                 if total_count == 0:
                     await self._reply_to_source(
-                        boardcast_info, [MessageBuilder.text(self.get_tr("list_empty"))]
+                        broadcast_info, [MessageBuilder.text(self.get_tr("list_empty"))]
                     )
                 else:
                     merged_message = self.get_tr(
@@ -545,19 +604,19 @@ class PlayerListSystem(BasicSystem):
                         details="\n\n".join(result_parts),
                     )
                     await self._reply_to_source(
-                        boardcast_info, [MessageBuilder.text(merged_message)]
+                        broadcast_info, [MessageBuilder.text(merged_message)]
                     )
 
         except Exception as e:
             self.logger.error(f"发送合并结果失败: {e}")
 
     async def _broadcast_query_to_bridge_with_id(
-        self, boardcast_info: BoardcastInfo, query_id: str, list_type: ListType
+            self, broadcast_info: BroadcastInfo, query_id: str, list_type: ListType
     ) -> None:
         """广播带查询ID的查询命令到其他服务器"""
         try:
             if not self.config.get_keys(
-                ["connector", "minecraft_bridge", "enable"], False
+                    ["connector", "minecraft_bridge", "enable"], False
             ):
                 return
 
@@ -578,14 +637,14 @@ class PlayerListSystem(BasicSystem):
 
             processed_info = ProcessedInfo(
                 processed_message=[MessageBuilder.text(command_text)],
-                _source=boardcast_info.source,  # 传递完整的 Source 对象
-                source_id=boardcast_info.source_id,
-                sender=boardcast_info.sender,
-                sender_id=boardcast_info.sender_id,
-                raw=boardcast_info.raw,
-                server=boardcast_info.server,
-                logger=boardcast_info.logger,
-                event_sub_type=boardcast_info.event_sub_type,
+                _source=broadcast_info.source,  # 传递完整的 Source 对象
+                source_id=broadcast_info.source_id,
+                sender=broadcast_info.sender,
+                sender_id=broadcast_info.sender_id,
+                raw=broadcast_info.raw,
+                server=broadcast_info.server,
+                logger=broadcast_info.logger,
+                event_sub_type=broadcast_info.event_sub_type,
             )
 
             await self.system_manager.connector_manager.broadcast_processed_info(
@@ -596,51 +655,54 @@ class PlayerListSystem(BasicSystem):
             self.logger.error(f"广播带ID的查询命令失败: {e}")
 
     async def _handle_list_command_local(
-        self, boardcast_info: BoardcastInfo, list_type: ListType
+            self, broadcast_info: BroadcastInfo, list_type: ListType
     ) -> None:
         """处理本地列表命令"""
         try:
-            if self.server.is_rcon_running():
+            use_query = self.config.get_keys(
+                ["system", "list", "use_query_protocol"], False
+            )
+            rcon_available = self.server.is_rcon_running()
+
+            if use_query or rcon_available:
                 use_bot_list = self.config.get_keys(
                     ["system", "list", "use_bot_list"], False
                 )
 
-                if use_bot_list:
-                    # leaves/lophine 端：使用专门的方法获取分离的玩家和假人列表
+                if use_query or use_bot_list:
                     real_players, bots = self._get_local_players_and_bots()
                     formatted_result = self._format_separated_list(
                         real_players, bots, list_type
                     )
                 else:
-                    # 其他端：使用传统方式，从 /list 结果中分离
                     result = self.server.rcon_query("list")
                     formatted_result = self._format_player_list(result, list_type)
 
                 if formatted_result:
                     await self._reply_to_source(
-                        boardcast_info, [MessageBuilder.text(formatted_result)]
+                        broadcast_info, [MessageBuilder.text(formatted_result)]
                     )
                     return
 
             self.logger.warning(self.get_tr("rcon_not_running"))
             await self._reply_to_source(
-                boardcast_info, [MessageBuilder.text(self.get_tr("rcon_not_running"))]
+                broadcast_info, [MessageBuilder.text(self.get_tr("rcon_not_running"))]
             )
 
         except Exception as e:
             self.logger.error(f"Query player list failed: {e}")
             await self._reply_to_source(
-                boardcast_info,
+                broadcast_info,
                 [MessageBuilder.text(self.get_tr("query_failed", error=str(e)))],
             )
 
     async def _send_response_to_bridge(
-        self, boardcast_info: BoardcastInfo, query_id: str, list_type: ListType
+            self, broadcast_info: BroadcastInfo, query_id: str, list_type: ListType
     ) -> None:
         """发送响应给主服务器"""
         try:
             if not self.config.get_keys(
-                ["connector", "minecraft_bridge", "enable"], False
+                    ["connector", "minecraft_bridge", "enable"], False
             ):
                 return
 
@@ -665,14 +727,14 @@ class PlayerListSystem(BasicSystem):
 
             processed_info = ProcessedInfo(
                 processed_message=[MessageBuilder.text(response_text)],
-                _source=boardcast_info.source,  # 传递完整的 Source 对象
-                source_id=boardcast_info.source_id,
-                sender=boardcast_info.sender,
-                sender_id=boardcast_info.sender_id,
-                raw=boardcast_info.raw,
-                server=boardcast_info.server,
-                logger=boardcast_info.logger,
-                event_sub_type=boardcast_info.event_sub_type,
+                _source=broadcast_info.source,  # 传递完整的 Source 对象
+                source_id=broadcast_info.source_id,
+                sender=broadcast_info.sender,
+                sender_id=broadcast_info.sender_id,
+                raw=broadcast_info.raw,
+                server=broadcast_info.server,
+                logger=broadcast_info.logger,
+                event_sub_type=broadcast_info.event_sub_type,
             )
 
             await self.system_manager.connector_manager.broadcast_processed_info(
@@ -683,10 +745,10 @@ class PlayerListSystem(BasicSystem):
             self.logger.error(f"发送响应到 bridge 失败: {e}")
 
     def _format_separated_list(
-        self,
-        real_players: List[str],
-        bots: List[str],
-        list_type: ListType = ListType.PLAYERS,
+            self,
+            real_players: List[str],
+            bots: List[str],
+            list_type: ListType = ListType.PLAYERS,
     ) -> str:
         """格式化已分离的玩家和假人列表输出（用于 leaves/lophine 端）"""
         try:
@@ -694,7 +756,7 @@ class PlayerListSystem(BasicSystem):
                 if not real_players:
                     return self.get_tr("players_empty")
                 real_players.sort()
-                players_list = [f"{i+1}. {p}" for i, p in enumerate(real_players)]
+                players_list = [f"{i + 1}. {p}" for i, p in enumerate(real_players)]
                 return self.get_tr(
                     "players_content",
                     count=len(real_players),
@@ -705,7 +767,7 @@ class PlayerListSystem(BasicSystem):
                 if not bots:
                     return self.get_tr("bots_empty")
                 bots.sort()
-                bots_list = [f"{i+1}. {b}" for i, b in enumerate(bots)]
+                bots_list = [f"{i + 1}. {b}" for i, b in enumerate(bots)]
                 return self.get_tr(
                     "bots_content", count=len(bots), bots="\n" + "\n".join(bots_list)
                 )
@@ -715,7 +777,7 @@ class PlayerListSystem(BasicSystem):
 
                 if real_players:
                     real_players.sort()
-                    players_list = [f"  {i+1}. {p}" for i, p in enumerate(real_players)]
+                    players_list = [f"  {i + 1}. {p}" for i, p in enumerate(real_players)]
                     result_parts.append(
                         self.get_tr(
                             "local_players_label",
@@ -728,7 +790,7 @@ class PlayerListSystem(BasicSystem):
 
                 if bots:
                     bots.sort()
-                    bots_list = [f"  {i+1}. {b}" for i, b in enumerate(bots)]
+                    bots_list = [f"  {i + 1}. {b}" for i, b in enumerate(bots)]
                     result_parts.append(
                         self.get_tr(
                             "local_bots_label",
@@ -751,7 +813,7 @@ class PlayerListSystem(BasicSystem):
             return ""
 
     def _format_player_list(
-        self, raw_result: str, list_type: ListType = ListType.PLAYERS
+            self, raw_result: str, list_type: ListType = ListType.PLAYERS
     ) -> str:
         """格式化玩家列表输出"""
         try:
@@ -782,7 +844,7 @@ class PlayerListSystem(BasicSystem):
                 if not real_players:
                     return self.get_tr("players_empty")
                 real_players.sort()
-                players_list = [f"{i+1}. {p}" for i, p in enumerate(real_players)]
+                players_list = [f"{i + 1}. {p}" for i, p in enumerate(real_players)]
                 return self.get_tr(
                     "players_content",
                     count=len(real_players),
@@ -793,7 +855,7 @@ class PlayerListSystem(BasicSystem):
                 if not bots:
                     return self.get_tr("bots_empty")
                 bots.sort()
-                bots_list = [f"{i+1}. {b}" for i, b in enumerate(bots)]
+                bots_list = [f"{i + 1}. {b}" for i, b in enumerate(bots)]
                 return self.get_tr(
                     "bots_content", count=len(bots), bots="\n" + "\n".join(bots_list)
                 )
@@ -803,7 +865,7 @@ class PlayerListSystem(BasicSystem):
 
                 if real_players:
                     real_players.sort()
-                    players_list = [f"  {i+1}. {p}" for i, p in enumerate(real_players)]
+                    players_list = [f"  {i + 1}. {p}" for i, p in enumerate(real_players)]
                     result_parts.append(
                         self.get_tr(
                             "local_players_label",
@@ -816,7 +878,7 @@ class PlayerListSystem(BasicSystem):
 
                 if bots:
                     bots.sort()
-                    bots_list = [f"  {i+1}. {b}" for i, b in enumerate(bots)]
+                    bots_list = [f"  {i + 1}. {b}" for i, b in enumerate(bots)]
                     result_parts.append(
                         self.get_tr(
                             "local_bots_label",
@@ -839,7 +901,7 @@ class PlayerListSystem(BasicSystem):
             return raw_result
 
     def parse_player_list(
-        self, player_list: str, colon_separator: str = ":", comma_separator: str = ","
+            self, player_list: str, colon_separator: str = ":", comma_separator: str = ","
     ) -> List[str]:
         """解析玩家列表字符串"""
         if not player_list:
@@ -865,12 +927,12 @@ class PlayerListSystem(BasicSystem):
             return []
 
     async def _broadcast_query_to_bridge(
-        self, boardcast_info: BoardcastInfo, list_type: ListType
+            self, broadcast_info: BroadcastInfo, list_type: ListType
     ) -> None:
         """Broadcast query command to other servers via bridge."""
         try:
             if not self.config.get_keys(
-                ["connector", "minecraft_bridge", "enable"], False
+                    ["connector", "minecraft_bridge", "enable"], False
             ):
                 return
 
@@ -889,14 +951,14 @@ class PlayerListSystem(BasicSystem):
 
             processed_info = ProcessedInfo(
                 processed_message=[MessageBuilder.text(command_text)],
-                _source=boardcast_info.source,  # 传递完整的 Source 对象
-                source_id=boardcast_info.source_id,
-                sender=boardcast_info.sender,
-                sender_id=boardcast_info.sender_id,
-                raw=boardcast_info.raw,
-                server=boardcast_info.server,
-                logger=boardcast_info.logger,
-                event_sub_type=boardcast_info.event_sub_type,
+                _source=broadcast_info.source,  # 传递完整的 Source 对象
+                source_id=broadcast_info.source_id,
+                sender=broadcast_info.sender,
+                sender_id=broadcast_info.sender_id,
+                raw=broadcast_info.raw,
+                server=broadcast_info.server,
+                logger=broadcast_info.logger,
+                event_sub_type=broadcast_info.event_sub_type,
             )
 
             await self.system_manager.connector_manager.broadcast_processed_info(

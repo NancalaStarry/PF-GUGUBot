@@ -1,12 +1,11 @@
 import json
 import logging
-import traceback
-import threading
 import ssl
-from typing import Any, Optional, Callable, Dict
+import threading
+import traceback
+from typing import Any, Callable, Dict, Optional
 
 import websocket
-
 
 logging.getLogger("websocket").setLevel(logging.WARNING)
 
@@ -31,14 +30,14 @@ class WebSocketClient:
     """
 
     def __init__(
-        self,
-        url: str,
-        headers: Optional[Dict[str, str]] = None,
-        on_message: Optional[Callable] = None,
-        on_open: Optional[Callable] = None,
-        on_error: Optional[Callable] = None,
-        on_close: Optional[Callable] = None,
-        logger: Optional[logging.Logger] = None,
+            self,
+            url: str,
+            headers: Optional[Dict[str, str]] = None,
+            on_message: Optional[Callable] = None,
+            on_open: Optional[Callable] = None,
+            on_error: Optional[Callable] = None,
+            on_close: Optional[Callable] = None,
+            logger: Optional[logging.Logger] = None,
     ):
         """初始化WebSocket客户端
 
@@ -46,17 +45,17 @@ class WebSocketClient:
         ----------
         url : str
             WebSocket服务器URL
-        headers : Optional[Dict[str, str]]
+        headers : Dict[str, str], optional
             HTTP请求头
-        on_message : Optional[Callable]
+        on_message : Callable, optional
             消息接收回调函数
-        on_open : Optional[Callable]
+        on_open : Callable, optional
             连接建立回调函数
-        on_error : Optional[Callable]
+        on_error : Callable, optional
             错误处理回调函数
-        on_close : Optional[Callable]
+        on_close : Callable. optional
             连接关闭回调函数
-        logger : Optional[logging.Logger]
+        logger : logging.Logger, optional
             日志记录器
         """
         self.url = url
@@ -72,37 +71,39 @@ class WebSocketClient:
         self._on_close_callback = on_close
 
     def connect(
-        self,
-        reconnect: int = 5,
-        ping_interval: int = 20,
-        ping_timeout: int = 10,
-        use_ssl: bool = False,
-        verify: bool = True,
-        ca_certs: Optional[str] = None,
-        extra_sslopt: Optional[Dict[str, Any]] = None,
-        thread_name: str = "WebSocketClient",
-        suppress_origin: bool = True,
+            self,
+            reconnect: int = 5,
+            ping_interval: int = 20,
+            ping_timeout: int = 10,
+            use_ssl: bool = False,
+            verify: bool = True,
+            ca_certs: Optional[str] = None,
+            extra_sslopt: Optional[Dict[str, Any]] = None,
+            thread_name: str = "WebSocketClient",
+            suppress_origin: bool = True,
     ) -> None:
         """建立WebSocket连接
 
         Parameters
         ----------
-        reconnect : int
-            重连间隔时间（秒），默认5秒
-        ping_interval : int
-            心跳间隔时间（秒），默认20秒
-        ping_timeout : int
-            心跳超时时间（秒），默认10秒
-        use_ssl : bool
-            是否使用SSL/TLS加密连接
-        verify : bool
-            是否验证SSL证书
-        ca_certs : Optional[str]
-            CA证书文件路径
-        extra_sslopt : Optional[Dict[str, Any]]
-            额外的SSL选项
-        thread_name : str
+        reconnect : int, optional
+            重连间隔时间（秒），默认 ``5`` 秒
+        ping_interval : int, optional
+            心跳间隔时间（秒），默认 ``20`` 秒
+        ping_timeout : int, optional
+            心跳超时时间（秒），默认 ``10`` 秒
+        use_ssl : bool, optional
+            是否使用 SSL/TLS 加密连接
+        verify : bool, optional
+            是否验证 SSL 证书
+        ca_certs : str, optional
+            CA 证书文件路径
+        extra_sslopt : Dict[str, Any], optional
+            额外的 SSL 选项
+        thread_name : str, optional
             监听线程名称
+        suppress_origin : bool, optional
+            是否抑制 WebSocket 握手中的 Origin 头，默认 ``True``
         """
         self.logger.debug(f"正在连接到WebSocket服务器: {self.url}")
 
@@ -208,5 +209,5 @@ class WebSocketClient:
             是否已连接
         """
         return (
-            self.ws is not None and self.ws.sock is not None and self.ws.sock.connected
+                self.ws is not None and self.ws.sock is not None and self.ws.sock.connected
         )

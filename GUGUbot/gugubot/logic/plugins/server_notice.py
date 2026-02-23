@@ -4,19 +4,20 @@
 """
 
 from typing import Optional
+
 from mcdreforged.api.types import PluginServerInterface
 
 from gugubot.builder import MessageBuilder
-from gugubot.utils.types import ProcessedInfo
 from gugubot.config.BotConfig import BotConfig
+from gugubot.utils.types import ProcessedInfo
 
 
 async def broadcast_server_start(
-    server: PluginServerInterface,
-    connector_manager,
-    config: BotConfig,
-    message: Optional[str] = None,
-    exclude_sources: Optional[list] = None,
+        server: PluginServerInterface,
+        connector_manager,
+        config: BotConfig,
+        message: Optional[str] = None,
+        exclude_sources: Optional[list] = None,
 ) -> None:
     """广播服务器启动消息。
 
@@ -28,9 +29,9 @@ async def broadcast_server_start(
         连接器管理器实例
     config : BotConfig
         配置对象
-    message : Optional[str]
+    message : str, optional
         自定义启动消息，如果为None则使用配置文件中的消息
-    exclude_sources : Optional[list]
+    exclude_sources : list, optional
         不发送通知的连接器源列表，默认从配置文件读取Minecraft的source_name
 
     Example
@@ -77,11 +78,11 @@ async def broadcast_server_start(
 
 
 async def broadcast_server_stop(
-    server: PluginServerInterface,
-    connector_manager,
-    config: BotConfig,
-    message: Optional[str] = None,
-    exclude_sources: Optional[list] = None,
+        server: PluginServerInterface,
+        connector_manager,
+        config: BotConfig,
+        message: Optional[str] = None,
+        exclude_sources: Optional[list] = None,
 ) -> None:
     """广播服务器停止消息。
 
@@ -93,9 +94,9 @@ async def broadcast_server_stop(
         连接器管理器实例
     config : BotConfig
         配置对象
-    message : Optional[str]
+    message : str, optional
         自定义停止消息，如果为None则使用配置文件中的消息
-    exclude_sources : Optional[list]
+    exclude_sources : list, optional
         不发送通知的连接器源列表，默认从配置文件读取Minecraft的source_name
 
     Example

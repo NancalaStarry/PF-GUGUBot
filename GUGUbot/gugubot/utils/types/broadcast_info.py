@@ -2,14 +2,13 @@ from dataclasses import dataclass, field
 from logging import Logger
 from typing import Any, List, Literal, Optional, Union
 
-
 from mcdreforged.api.types import PluginServerInterface
 
 from gugubot.utils.types.source import Source
 
 
 @dataclass
-class BoardcastInfo:
+class BroadcastInfo:
     """广播信息类，用于在系统间传递消息。
 
     Attributes
@@ -22,8 +21,6 @@ class BoardcastInfo:
         消息内容列表
     raw : Any
         原始消息数据
-    source : Source
-        消息来源链，追踪消息经过的所有来源
     source_id : str
         来源ID（如QQ群号、服务器名）
     sender : str
