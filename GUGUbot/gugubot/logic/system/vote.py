@@ -61,8 +61,8 @@ class VoteSystem(BasicSystem):
         # 获取调试配置
         self.debug_enabled = self.config.get_keys(["GUGUBot", "show_message_in_console"], False)
 
-        # 当前投票监控任务
-        self._monitor_task: Optional[asyncio.Task] = None
+        # 当前投票监控任务（vote_id -> Task，支持多个并发投票）
+        self._monitor_tasks: dict[str, asyncio.Task] = {}
 
     def debug_log(self, message: str, to_server: bool = False) -> None:
         """输出调试日志（仅在debug_enabled为True时）
@@ -172,12 +172,12 @@ class VoteSystem(BasicSystem):
                 return await self._handle_switch(True, broadcast_info)
             elif command == disable_cmd:
                 return await self._handle_switch(False, broadcast_info)
-            elif command.startswith(self.get_tr("remove")):
-                # 处理删除投票命令
-                return await self._handle_remove(broadcast_info)
             elif command.startswith(self.get_tr("removeAll")):
                 # 处理删除所有投票命令
                 return await self._handle_remove_all(broadcast_info)
+            elif command.startswith(self.get_tr("remove")):
+                # 处理删除投票命令
+                return await self._handle_remove(broadcast_info)
 
         # 所有用户都可以使用的命令
         if command.startswith(self.get_tr("list")):
@@ -421,6 +421,10 @@ class VoteSystem(BasicSystem):
 
         success = self.vote_manager.delete_vote(vote.vote_id)
         if success:
+            # 取消该投票的监控任务
+            task = self._monitor_tasks.pop(vote.vote_id, None)
+            if task:
+                task.cancel()
             msg = self.get_tr(
                 "vote_removed",
                 admin=broadcast_info.sender,
@@ -448,6 +452,9 @@ class VoteSystem(BasicSystem):
         for vote in pending_votes:
             if self.vote_manager.delete_vote(vote.vote_id):
                 count += 1
+                task = self._monitor_tasks.pop(vote.vote_id, None)
+                if task:
+                    task.cancel()
 
         msg = self.get_tr(
             "all_votes_removed",
@@ -914,7 +921,7 @@ class VoteSystem(BasicSystem):
             await self._broadcast_to_all(msg)
 
         # 启动投票监控任务
-        self._monitor_task = asyncio.create_task(self._monitor_vote(vote.vote_id))
+        self._monitor_tasks[vote.vote_id] = asyncio.create_task(self._monitor_vote(vote.vote_id))
 
     async def _handle_vote(self, broadcast_info: BroadcastInfo, vote_yes: bool, index: Optional[int] = None) -> None:
         """处理投票（赞成或反对）
@@ -958,13 +965,20 @@ class VoteSystem(BasicSystem):
                 tr_key = "multiple_votes_specify_no"
 
             example = f"{example_keywords[0]} 1" if example_keywords else ("yes 1" if vote_yes else "no 1")
-            msg = self.get_tr(
-                tr_key,
-                count=len(pending_votes),
-                vote_list="\n".join(vote_list),
-                yes_example=example if vote_yes else None,
-                no_example=example if not vote_yes else None
-            )
+            if vote_yes:
+                msg = self.get_tr(
+                    tr_key,
+                    count=len(pending_votes),
+                    vote_list="\n".join(vote_list),
+                    yes_example=example
+                )
+            else:
+                msg = self.get_tr(
+                    tr_key,
+                    count=len(pending_votes),
+                    vote_list="\n".join(vote_list),
+                    no_example=example
+                )
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
             return
 
@@ -1019,9 +1033,10 @@ class VoteSystem(BasicSystem):
             if result and result != VoteStatus.PENDING:
                 # 投票已结束，处理结果
                 await self._handle_vote_result(vote, result)
-                # 取消监控任务
-                if self._monitor_task:
-                    self._monitor_task.cancel()
+                # 取消该投票的监控任务
+                task = self._monitor_tasks.pop(vote.vote_id, None)
+                if task:
+                    task.cancel()
 
     async def _handle_delete(self, broadcast_info: BroadcastInfo) -> None:
         """处理取消投票（仅管理员）"""
@@ -1062,9 +1077,10 @@ class VoteSystem(BasicSystem):
             )
             await self._broadcast_to_all(msg)
 
-            # 取消监控任务
-            if self._monitor_task:
-                self._monitor_task.cancel()
+            # 取消该投票的监控任务
+            task = self._monitor_tasks.pop(vote.vote_id, None)
+            if task:
+                task.cancel()
 
     async def _monitor_vote(self, vote_id: str) -> None:
         """监控投票超时
@@ -1105,6 +1121,9 @@ class VoteSystem(BasicSystem):
 
         except asyncio.CancelledError:
             self.logger.debug(f"[VoteSystem] 投票 {vote_id} 监控任务被取消")
+        finally:
+            # 无论如何都清理任务引用
+            self._monitor_tasks.pop(vote_id, None)
 
     async def _handle_vote_result(self, vote: Vote, result: VoteStatus) -> None:
         """处理投票结果
@@ -1410,4 +1429,6 @@ class VoteSystem(BasicSystem):
         str
             关键词模板字符串
         """
-        return f" {self.get_tr("or")} ".join(keywords[:count]) if len(keywords) > 1 else keywords[0]
+        if not keywords:
+            return ""
+        return f" {self.get_tr('or')} ".join(keywords[:count]) if len(keywords) > 1 else keywords[0]
