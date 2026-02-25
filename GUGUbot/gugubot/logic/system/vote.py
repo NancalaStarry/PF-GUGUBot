@@ -766,6 +766,9 @@ class VoteSystem(BasicSystem):
         self.debug_log(f"[VoteSystem Debug] 收到{vote_config.vote_type}类型的投票请求，发起人: {broadcast_info.sender}, "
                        f"征求模式: {consult_mode}")
 
+        # 发起投票前从磁盘重新加载最新绑定数据，确保资格名单是最新的。
+        self.player_manager.load()
+
         # 获取所有在线玩家的绑定信息
         eligible_voters = await self._get_eligible_voters()
 
@@ -1192,6 +1195,7 @@ class VoteSystem(BasicSystem):
         eligible = set()
 
         try:
+
             # 获取在线玩家列表
             online_players = self._get_online_players()
             self.debug_log(f"[VoteSystem Debug] 在线玩家列表: {online_players}")
@@ -1259,6 +1263,8 @@ class VoteSystem(BasicSystem):
         qq_source = self.config.get_keys(["connector", "QQ", "source_name"], "QQ")
 
         # 从PlayerManager查询（使用sender_name作为玩家名）
+        # 注意：此处不重新加载，投票资格在发起时已通过 _get_eligible_voters() 确定，
+        # 投票进行中新增的绑定不应影响当前投票的资格名单。
         player = self.player_manager.get_player(sender_name)
 
         if player:
