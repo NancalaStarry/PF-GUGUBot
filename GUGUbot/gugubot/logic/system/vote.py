@@ -793,8 +793,10 @@ class VoteSystem(BasicSystem):
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
             return
 
-        # 检查是否有足够的合格的投票者（管理员可以绕过此限制）
-        if not eligible_voters and not broadcast_info.is_admin:
+        # 检查是否有足够的合格的投票者
+        # 征求模式下，即使是管理员也不能在无人可投票时发起（没有人可以响应）
+        # 非征求模式下，管理员可以绕过此限制（管理员会将自己加入投票者并自动投赞成票）
+        if not eligible_voters and (consult_mode or not broadcast_info.is_admin):
             msg = self.get_tr("no_eligible_voters")
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
             return
@@ -1119,7 +1121,7 @@ class VoteSystem(BasicSystem):
             self.logger.debug(f"[VoteSystem] 投票 {vote_id} 监控任务被取消")
         finally:
             # 无论如何都清理任务引用
-            self._monitor_tasks.pop(vote_id, None)
+            await self._monitor_tasks.pop(vote_id, None)
 
     async def _handle_vote_result(self, vote: Vote, result: VoteStatus) -> None:
         """处理投票结果
