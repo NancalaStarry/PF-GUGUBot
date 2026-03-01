@@ -113,15 +113,31 @@ class VoteTypeRegistry:
         return True
 
     def get_config(self, vote_type: str) -> Optional[VoteTypeConfig]:
-        """获取投票类型配置"""
+        """获取投票类型配置
+
+        Parameters
+        ----------
+        vote_type : str
+            投票类型标识符
+        Returns
+        -------
+        VoteTypeConfig, optional
+            投票类型配置，如果未注册则返回None
+        """
+
         return self._registry.get(vote_type)
 
     def get_by_keyword(self, keyword: str) -> Optional[tuple[VoteTypeConfig, bool]]:
         """根据关键词获取投票类型配置
 
+        Parameters
+        ----------
+        keyword : str
+            触发投票的关键词
+
         Returns
         -------
-        Optional[tuple[VoteTypeConfig, bool]]
+        tuple[VoteTypeConfig, bool], optional
             (投票类型配置, 是否为征求模式)，如果关键词未注册则返回None
         """
         vote_type = self._keyword_map.get(keyword)
