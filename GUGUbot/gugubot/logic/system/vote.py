@@ -378,15 +378,25 @@ class VoteSystem(BasicSystem):
             return True
 
         # 模糊匹配（用于 consult_keywords）
+        # 仅当消息包含关键词且不完全相等时触发（完全相等已由上方精确匹配处理）
         for keyword in self.vote_type_registry.get_all_keywords():
-            if keyword in message_text and keyword != message_text:
-                result = self.vote_type_registry.get_by_keyword(keyword)
-                if result:
-                    vote_config, is_consult = result
-                    if is_consult:
-                        self.debug_log(f"[VoteSystem Debug] 模糊匹配到征求模式关键词: '{keyword}'")
-                        await self._handle_start_vote_with_config(broadcast_info, vote_config, True)
-                        return True
+            if keyword not in message_text:
+                # 关键词不在消息中，跳过
+                continue
+            if keyword == message_text:
+                # 完全相等的情况已由精确匹配处理，此处跳过避免重复触发
+                continue
+            result = self.vote_type_registry.get_by_keyword(keyword)
+
+            if not result:
+                continue
+
+            vote_config, is_consult = result
+
+            if is_consult:
+                self.debug_log(f"[VoteSystem Debug] 模糊匹配到征求模式关键词: '{keyword}'")
+                await self._handle_start_vote_with_config(broadcast_info, vote_config, True)
+                return True
 
         # 检查投赞成票关键词
         self.debug_log(f"[VoteSystem Debug] 检查赞成票关键词: {self.yes_keywords}")
@@ -1402,22 +1412,22 @@ class VoteSystem(BasicSystem):
                 # 通过PlayerManager获取玩家对象
                 player = self.player_manager.get_player(player_name)
 
-                if player:
-                    self.debug_log(f"[VoteSystem Debug] 找到玩家对象: {player.name}")
-
-                    # 获取该玩家的QQ账号列表
-                    qq_ids = player.accounts.get(qq_source, [])
-                    self.debug_log(f"[VoteSystem Debug] 玩家 '{player_name}' 绑定账号数: {len(qq_ids)}")
-
-                    if qq_ids:
-                        eligible.update([qq_id for qq_id in qq_ids])
-                        self.debug_log(f"[VoteSystem Debug] {player_name} 已绑定，有投票资格")
-                    else:
-                        self.debug_log(f"[VoteSystem Debug] 玩家 '{player_name}' 没有绑定QQ")
-                        self.debug_log(f"[VoteSystem Debug] {player_name} 未绑定QQ，无投票资格")
-                else:
+                if not player:
                     self.debug_log(f"[VoteSystem Debug] 在PlayerManager中找不到玩家 '{player_name}'")
                     self.debug_log(f"[VoteSystem Debug] 找不到玩家 {player_name} 的绑定信息")
+                    return set()  # 无法获取玩家信息，返回空集合
+
+                self.debug_log(f"[VoteSystem Debug] 找到玩家对象: {player.name}")
+                # 获取该玩家的QQ账号列表
+                qq_ids = player.accounts.get(qq_source, [])
+                self.debug_log(f"[VoteSystem Debug] 玩家 '{player_name}' 绑定账号数: {len(qq_ids)}")
+
+                if qq_ids:
+                    eligible.update([qq_id for qq_id in qq_ids])
+                    self.debug_log(f"[VoteSystem Debug] {player_name} 已绑定，有投票资格")
+                else:
+                    self.debug_log(f"[VoteSystem Debug] 玩家 '{player_name}' 没有绑定QQ")
+                    self.debug_log(f"[VoteSystem Debug] {player_name} 未绑定QQ，无投票资格")
 
             self.debug_log(f"[VoteSystem Debug] 有投票资格的人数: {len(eligible)}")
 
