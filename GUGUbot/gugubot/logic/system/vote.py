@@ -832,14 +832,14 @@ class VoteSystem(BasicSystem):
 
             if initiator_voter_id and initiator_voter_id in eligible_voters:
                 self.debug_log(f"[VoteSystem Debug] ✓ 发起人({broadcast_info.sender})有投票资格，投赞成票")
-                success, is_new = vote.cast_vote(initiator_voter_id, True)
+                success, is_new, _ = vote.cast_vote(initiator_voter_id, True)
                 self.debug_log(f"[VoteSystem Debug] cast_vote返回值: success={success}, is_new={is_new}")
                 self.debug_log(f"[VoteSystem Debug] 投票后 yes={vote.get_progress()['yes_votes']}, no={vote.get_progress()['no_votes']}")
             elif broadcast_info.is_admin:
                 # 管理员绕过：将管理员的 sender_id 临时添加到投票资格中并自动投赞成票
                 self.debug_log(f"[VoteSystem Debug] ✓ 管理员({broadcast_info.sender})绕过在线限制，直接发起投票并投赞成票")
                 vote.eligible_voters.add(broadcast_info.sender_id)
-                success, is_new = vote.cast_vote(broadcast_info.sender_id, True)
+                success, is_new, _ = vote.cast_vote(broadcast_info.sender_id, True)
                 self.debug_log(f"[VoteSystem Debug] 管理员cast_vote返回值: success={success}, is_new={is_new}")
             else:
                 self.debug_log(f"[VoteSystem Debug] ✗ 发起人({broadcast_info.sender})无法自动投票")
@@ -1010,9 +1010,19 @@ class VoteSystem(BasicSystem):
         # 投票
         self.debug_log(f"[VoteSystem Debug] {broadcast_info.sender} 准备投{'赞成' if vote_yes else '反对'}票")
         self.debug_log(f"[VoteSystem Debug] 投票前 yes={vote.get_progress()['yes_votes']}, no={vote.get_progress()['no_votes']}")
-        success, is_new_vote = vote.cast_vote(actual_voter_id, vote_yes)
+        success, is_new_vote, is_same_vote = vote.cast_vote(actual_voter_id, vote_yes)
         self.debug_log(f"[VoteSystem Debug] 投票后 yes={vote.get_progress()['yes_votes']}, no={vote.get_progress()['no_votes']}")
         if success:
+            # 如果投的是和之前一样的票，只提示本人，不广播
+            if is_same_vote:
+                vote_type_tr = self.get_tr("vote_yes" if vote_yes else "vote_no")
+                msg = self.get_tr(
+                    "vote_already_same",
+                    vote_type=vote_type_tr
+                )
+                await self.reply(broadcast_info, [MessageBuilder.text(msg)])
+                return
+
             progress = vote.get_progress()
             vote_type_tr = self.get_tr("vote_yes" if vote_yes else "vote_no")
             # 根据是新票还是改票使用不同的翻译键
@@ -1263,7 +1273,6 @@ class VoteSystem(BasicSystem):
         qq_source = self.config.get_keys(["connector", "QQ", "source_name"], "QQ")
 
         # 从PlayerManager查询（使用sender_name作为玩家名）
-        # 注意：此处不重新加载，投票资格在发起时已通过 _get_eligible_voters() 确定，
         # 投票进行中新增的绑定不应影响当前投票的资格名单。
         player = self.player_manager.get_player(sender_name)
 

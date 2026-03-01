@@ -422,6 +422,7 @@ gugubot:
             vote_started_consult: "【Vote Consultation】{initiator} initiated {vote_name} (consult)\n- {description}\n- Required: {required_percentage}% approval, {total_voters} eligible voters\n- Timeout: {timeout}s\n- Send {yes_example} to vote yes, {no_example} to vote no, you can change your vote, send {withdraw_example} to withdraw\nCurrent votes - Yes/No/Total/Percentage: {yes_votes}/{no_votes}/{total_voters}/{current_percentage}"
             vote_new: "{voter} voted {vote_type} for {vote_name}\nYes/No/Total/Percentage: {yes_votes}/{no_votes}/{total_voters}/{current_percentage}"
             vote_changed: "{voter} changed vote to {vote_type} for {vote_name}\nYes/No/Total/Percentage: {yes_votes}/{no_votes}/{total_voters}/{current_percentage}"
+            vote_already_same: "You have already voted {vote_type}"
             vote_progress: "{voter} voted {vote_type} for {vote_name}\nYes/No/Total/Percentage: {yes_votes}/{no_votes}/{total_voters}/{current_percentage}"
             vote_passed: "【Vote Passed】{initiator}'s {vote_name} passed!\nYes/Total: {yes_votes}/{total_voters} ({current_percentage}%)"
             vote_rejected: "【Vote Failed】{initiator}'s {vote_name} failed\nYes/Total: {yes_votes}/{total_voters}, insufficient votes to pass"

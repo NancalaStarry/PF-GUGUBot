@@ -239,7 +239,7 @@ class Vote:
         self.status = VoteStatus.PENDING
         self.start_time = time.time()
 
-    def cast_vote(self, voter_id: str, vote_yes: bool) -> tuple[bool, bool]:
+    def cast_vote(self, voter_id: str, vote_yes: bool) -> tuple[bool, bool, bool]:
         """投票
 
         Parameters
@@ -251,17 +251,27 @@ class Vote:
 
         Returns
         -------
-        tuple[bool, bool]
-            第一个bool表示是否投票成功，第二个bool表示是否为新投票（True=新投票，False=改票）
+        tuple[bool, bool, bool]
+            第一个bool表示是否投票成功，第二个bool表示是否为新投票（True=新投票，False=改票），
+            第三个bool表示是否与之前的票相同（True=重复投相同的票）
         """
         if self.status != VoteStatus.PENDING:
-            return False, False
+            return False, False, False
 
         if voter_id not in self.eligible_voters:
-            return False, False
+            return False, False, False
 
         # 检查是否已经投过票（用于判断是新投票还是改票）
         is_new_vote = voter_id not in self.yes_votes and voter_id not in self.no_votes
+
+        # 检查是否与之前的票相同
+        is_same_vote = (
+            (vote_yes and voter_id in self.yes_votes) or
+            (not vote_yes and voter_id in self.no_votes)
+        )
+
+        if is_same_vote:
+            return True, False, True
 
         # 移除之前的投票
         self.yes_votes.discard(voter_id)
@@ -273,7 +283,7 @@ class Vote:
         else:
             self.no_votes.add(voter_id)
 
-        return True, is_new_vote
+        return True, is_new_vote, False
 
     def withdraw_vote(self, voter_id: str) -> bool:
         """撤回投票（弃票）
@@ -556,7 +566,7 @@ class VoteManager:
                 return vote
         return None
 
-    def cast_vote(self, vote_id: str, voter_id: str, vote_yes: bool) -> tuple[bool, bool]:
+    def cast_vote(self, vote_id: str, voter_id: str, vote_yes: bool) -> tuple[bool, bool, bool]:
         """投票
 
         Parameters
@@ -570,22 +580,29 @@ class VoteManager:
 
         Returns
         -------
-        tuple[bool, bool]
-            第一个bool表示是否投票成功，第二个bool表示是否为新投票（True=新投票，False=改票）
+        tuple[bool, bool, bool]
+            第一个bool表示是否投票成功，第二个bool表示是否为新投票（True=新投票，False=改票），
+            第三个bool表示是否与之前的票相同（True=重复投相同的票）
         """
         vote = self.get_vote(vote_id)
         if not vote:
-            return False, False
+            return False, False, False
 
-        success, is_new_vote = vote.cast_vote(voter_id, vote_yes)
+        success, is_new_vote, is_same_vote = vote.cast_vote(voter_id, vote_yes)
 
         if success and self.logger:
-            self.logger.debug(
-                f"[VoteManager] 用户 {voter_id} 对投票 {vote_id} "
-                f"投了{'赞成' if vote_yes else '反对'}票{'（新投票）' if is_new_vote else '（改票）'}"
-            )
+            if is_same_vote:
+                self.logger.debug(
+                    f"[VoteManager] 用户 {voter_id} 对投票 {vote_id} "
+                    f"重复投了{'赞成' if vote_yes else '反对'}票（与之前相同）"
+                )
+            else:
+                self.logger.debug(
+                    f"[VoteManager] 用户 {voter_id} 对投票 {vote_id} "
+                    f"投了{'赞成' if vote_yes else '反对'}票{'（新投票）' if is_new_vote else '（改票）'}"
+                )
 
-        return success, is_new_vote
+        return success, is_new_vote, is_same_vote
 
     def delete_vote(self, vote_id: str) -> bool:
         """取消并立即移除投票
