@@ -72,20 +72,16 @@ class VoteSystem(BasicSystem):
         # 当前投票监控任务（vote_id -> Task，支持多个并发投票）
         self._monitor_tasks: dict[str, asyncio.Task] = {}
 
-    def debug_log(self, message: str, to_server: bool = False) -> None:
+    def debug_log(self, message: str) -> None:
         """输出调试日志（仅在debug_enabled为True时）
 
         Parameters
         ----------
         message : str
             调试消息
-        to_server : bool
-            是否同时输出到游戏服务器
         """
         if self.debug_enabled:
-            self.logger.info(message)
-            if to_server:
-                self.server.say(message)
+            self.logger.debug(message)
 
     def _load_config(self) -> None:
         """从配置文件加载投票关键词设置。
@@ -1170,7 +1166,6 @@ class VoteSystem(BasicSystem):
             self.debug_log(f"[VoteSystem Debug] 无法解析投票者 {broadcast_info.sender} 的身份标识")
             msg = self.get_tr("not_eligible")
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
-            self.debug_log(f"§c[投票调试] {broadcast_info.sender} 无法获取身份标识", to_server=True)
             return
 
         self.debug_log(f"[VoteSystem Debug] 投票者 {broadcast_info.sender} 身份已解析，来源: {broadcast_info.source.origin}")
@@ -1393,8 +1388,6 @@ class VoteSystem(BasicSystem):
             online_players = self._get_online_players()
             self.debug_log(f"[VoteSystem Debug] 在线玩家列表: {online_players}")
             self.debug_log(f"[VoteSystem Debug] 在线玩家数量: {len(online_players)}")
-            self.debug_log(f"§e[投票调试] 在线玩家: {', '.join(online_players) if online_players else '无'}",
-                           to_server=True)
 
             # 获取QQ连接器的source_name
             qq_source = self.config.get_keys(
@@ -1418,21 +1411,19 @@ class VoteSystem(BasicSystem):
 
                     if qq_ids:
                         eligible.update([qq_id for qq_id in qq_ids])
-                        self.debug_log(f"§a[投票调试] {player_name} 已绑定，有投票资格", to_server=True)
+                        self.debug_log(f"[VoteSystem Debug] {player_name} 已绑定，有投票资格")
                     else:
                         self.debug_log(f"[VoteSystem Debug] 玩家 '{player_name}' 没有绑定QQ")
-                        self.debug_log(f"§c[投票调试] {player_name} 未绑定QQ，无投票资格", to_server=True)
+                        self.debug_log(f"[VoteSystem Debug] {player_name} 未绑定QQ，无投票资格")
                 else:
                     self.debug_log(f"[VoteSystem Debug] 在PlayerManager中找不到玩家 '{player_name}'")
-                    self.debug_log(f"§c[投票调试] 找不到玩家 {player_name} 的绑定信息", to_server=True)
+                    self.debug_log(f"[VoteSystem Debug] 找不到玩家 {player_name} 的绑定信息")
 
             self.debug_log(f"[VoteSystem Debug] 有投票资格的人数: {len(eligible)}")
-            self.debug_log(f"§e[投票调试] 总共 {len(eligible)} 人有投票资格", to_server=True)
 
         except Exception as e:
             self.logger.error(f"[VoteSystem] 获取投票资格用户失败: {e}")
             self.logger.error(f"[VoteSystem Debug] 异常堆栈:\n{traceback.format_exc()}")
-            self.debug_log(f"§c[投票调试] 获取投票资格失败: {e}", to_server=True)
 
         return eligible
 
