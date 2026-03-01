@@ -5,6 +5,8 @@
 """
 
 import asyncio
+import time
+import traceback
 from typing import Optional, Set, List
 
 from mcdreforged.api.types import PluginServerInterface
@@ -28,10 +30,16 @@ class VoteSystem(BasicSystem):
         系统名称
     enable : bool
         系统是否启用
+    server : PluginServerInterface
+        MCDR 服务器接口。
     vote_manager : VoteManager
         投票管理器实例
+    vote_type_registry : VoteTypeRegistry
+        投票类型注册器，管理所有已注册的投票类型配置。
     player_manager : PlayerManager
         玩家管理器实例
+    debug_enabled : bool
+        是否开启调试日志输出，由配置项 ``GUGUBot.show_message_in_console`` 控制。
     """
 
     def __init__(
@@ -51,7 +59,7 @@ class VoteSystem(BasicSystem):
         super().__init__("vote", enable=False, config=config)
         self.server = server
         self.player_manager = PlayerManager(server, self)
-        self.player_manager.load()  # 加载玩家数据
+        self.player_manager.load()
         self.vote_manager = VoteManager(server)
         self.vote_type_registry = VoteTypeRegistry()
 
@@ -80,7 +88,14 @@ class VoteSystem(BasicSystem):
                 self.server.say(message)
 
     def _load_config(self) -> None:
-        """从配置文件加载投票设置"""
+        """从配置文件加载投票关键词设置。
+
+        Notes
+        -----
+        读取 ``system.vote.keywords`` 配置节，分别设置
+        ``yes_keywords``、``no_keywords``、``withdraw_keywords``、``delete_keywords``
+        四个实例属性；缺失时使用内置默认值。
+        """
         # 加载全局投票关键词
         vote_keywords_config = self.config.get_keys(["system", "vote", "keywords"], {})
         self.yes_keywords = vote_keywords_config.get("yes", ["111", "同意", "赞成", "yes"])
@@ -89,11 +104,24 @@ class VoteSystem(BasicSystem):
         self.delete_keywords = vote_keywords_config.get("delete", ["删除投票", "delete_vote"])
 
     def _register_default_vote_types(self) -> None:
-        """注册默认的投票类型"""
+        """注册内置的默认投票类型。
+
+        Notes
+        -----
+        目前仅注册关服投票（``shutdown``）。
+        可通过 :meth:`register_vote_type` 在外部追加自定义类型。
+        """
         # 注册关服投票
         self._register_shutdown_vote_type()
 
     def _register_shutdown_vote_type(self) -> None:
+        """根据配置注册关服投票类型（``shutdown``）。
+
+        Notes
+        -----
+        从 ``system.vote.shutdown`` 配置节读取参数，
+        若该类型已被禁用（``enable: false``）则跳过注册并记录日志。
+        """
         shutdown_config_dict = self.config.get_keys(["system", "vote", "shutdown"], {})
         shutdown_keywords = shutdown_config_dict.get("keywords", {})
         shutdown_config = VoteTypeConfig(
@@ -116,7 +144,18 @@ class VoteSystem(BasicSystem):
             self.logger.warning("[VoteSystem] 注册默认投票类型失败: shutdown 已存在")
 
     def register_vote_type(self, config: VoteTypeConfig) -> bool:
-        """注册新的投票类型（供外部调用）"""
+        """注册新的投票类型（供外部插件调用）。
+
+        Parameters
+        ----------
+        config : VoteTypeConfig
+            要注册的投票类型配置。
+
+        Returns
+        -------
+        bool
+            注册成功返回 ``True``；已禁用或已存在则返回 ``False``。
+        """
         if not config.enabled:
             self.logger.info(f"[VoteSystem] 投票类型 {config.vote_type} 已禁用，跳过注册")
             return False
@@ -128,7 +167,18 @@ class VoteSystem(BasicSystem):
         return success
 
     def unregister_vote_type(self, vote_type: str) -> bool:
-        """注销投票类型（供外部调用）"""
+        """注销投票类型（供外部插件调用）。
+
+        Parameters
+        ----------
+        vote_type : str
+            要注销的投票类型标识符。
+
+        Returns
+        -------
+        bool
+            注销成功返回 ``True``；类型不存在则返回 ``False``。
+        """
         success = self.vote_type_registry.unregister(vote_type)
         if success:
             self.logger.info(f"[VoteSystem] 已注销投票类型: {vote_type}")
@@ -137,7 +187,13 @@ class VoteSystem(BasicSystem):
         return success
 
     def initialize(self) -> None:
-        """初始化系统"""
+        """初始化投票系统。
+
+        Notes
+        -----
+        - 将服务器日志记录器注入 :attr:`vote_manager`。
+        - 调用 :meth:`_register_default_vote_types` 注册内置投票类型。
+        """
         self.vote_manager.logger = self.logger
 
         # 注册默认的投票类型
@@ -146,7 +202,18 @@ class VoteSystem(BasicSystem):
         self.logger.debug("投票系统已初始化")
 
     async def _handle_command(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理投票相关命令"""
+        """解析并分发投票相关命令（以命令前缀开头的消息）。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息，其中 ``message[0]`` 应为文本类型的命令字符串。
+
+        Returns
+        -------
+        bool
+            命令被识别并处理返回 ``True``，否则返回 ``False``。
+        """
         command = broadcast_info.message[0].get("data", {}).get("text", "")
         command_prefix = self.config.get("GUGUBot", {}).get("command_prefix", "#")
         system_name = self.get_tr("name")
@@ -265,7 +332,23 @@ class VoteSystem(BasicSystem):
     async def _handle_keywords(
             self, broadcast_info: BroadcastInfo, message_text: str
     ) -> bool:
-        """处理关键词检测"""
+        """检测消息文本中的投票关键词并执行对应操作。
+
+        检测顺序：弃票关键词 → 删除关键词（仅管理员）→ 开始投票关键词（精确）→
+        征求模式关键词（模糊）→ 赞成票关键词 → 反对票关键词。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息。
+        message_text : str
+            从消息中提取的纯文本内容。
+
+        Returns
+        -------
+        bool
+            任意关键词匹配并处理返回 ``True``，否则返回 ``False``。
+        """
         self.debug_log(f"[VoteSystem Debug] _handle_keywords 被调用，消息: '{message_text}'")
 
         # 检查弃票关键词（所有用户）
@@ -374,7 +457,18 @@ class VoteSystem(BasicSystem):
         return vote.vote_type  # 如果找不到配置，返回类型标识符
 
     async def _handle_remove(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理删除投票命令（管理员）"""
+        """处理删除指定投票的命令（仅管理员）。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息，命令中应包含目标投票序号。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         if not broadcast_info.is_admin:
             msg = self.get_tr("admin_only")
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
@@ -436,7 +530,18 @@ class VoteSystem(BasicSystem):
         return True
 
     async def _handle_remove_all(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理删除所有投票命令（管理员）"""
+        """处理删除所有进行中投票的命令（仅管理员）。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         if not broadcast_info.is_admin:
             msg = self.get_tr("admin_only")
             await self.reply(broadcast_info, [MessageBuilder.text(msg)])
@@ -466,7 +571,18 @@ class VoteSystem(BasicSystem):
         return True
 
     async def _handle_list(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理列出所有投票命令"""
+        """处理列出所有进行中投票的命令。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         pending_votes = self.vote_manager.get_all_pending_votes()
 
         if not pending_votes:
@@ -500,7 +616,18 @@ class VoteSystem(BasicSystem):
         return True
 
     async def _handle_types(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理列出投票类型命令，仅显示序号+名字，提示用户查询详情"""
+        """处理列出投票类型的命令，仅显示序号与名称；若附带类型名则显示详情。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息，命令末尾可附带投票类型名称以查询详情。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         # 从命令中提取可能的类型名
         command = broadcast_info.message[0].get("data", {}).get("text", "")
         command_prefix = self.config.get("GUGUBot", {}).get("command_prefix", "#")
@@ -542,7 +669,20 @@ class VoteSystem(BasicSystem):
         return True
 
     async def _handle_type_detail(self, broadcast_info: BroadcastInfo, type_name: str) -> bool:
-        """显示特定投票类型的详细信息"""
+        """显示特定投票类型的详细信息。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息。
+        type_name : str
+            投票类型的显示名称或类型标识符。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         all_configs = self.vote_type_registry.get_all_configs()
 
         # 按翻译名称匹配
@@ -577,7 +717,18 @@ class VoteSystem(BasicSystem):
         return True
 
     async def _handle_withdraw(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理弃票命令（通过命令：#投票 弃票 [序号]）"""
+        """处理通过命令（``#投票 弃票 [序号]``）发起的弃票请求。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息，命令末尾可附带投票序号。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         # 从命令中提取序号
         command = broadcast_info.message[0].get("data", {}).get("text", "")
         command_prefix = self.config.get("GUGUBot", {}).get("command_prefix", "#")
@@ -701,7 +852,20 @@ class VoteSystem(BasicSystem):
         return None
 
     async def _handle_help(self, broadcast_info: BroadcastInfo) -> bool:
-        """处理帮助命令"""
+        """向用户回复帮助消息。
+
+        管理员与普通用户会收到不同内容的帮助文本。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息。
+
+        Returns
+        -------
+        bool
+            始终返回 ``True``（已处理该命令）。
+        """
         # 获取配置的命令前缀和命令名称
         command_prefix = self.config.get("GUGUBot", {}).get("command_prefix", "#")
         system_name = self.get_tr("name")
@@ -762,7 +926,18 @@ class VoteSystem(BasicSystem):
 
     async def _handle_start_vote_with_config(self, broadcast_info: BroadcastInfo, vote_config: VoteTypeConfig,
                                              consult_mode: bool) -> None:
-        """使用配置处理开始投票"""
+        """根据投票类型配置发起一次新投票。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息，``sender`` 将成为投票发起人。
+        vote_config : VoteTypeConfig
+            目标投票类型的配置对象。
+        consult_mode : bool
+            ``True`` 为征求模式（发起人不自动投赞成票）；
+            ``False`` 为普通模式（发起人自动投赞成票）。
+        """
         self.debug_log(f"[VoteSystem Debug] 收到{vote_config.vote_type}类型的投票请求，发起人: {broadcast_info.sender}, "
                        f"征求模式: {consult_mode}")
 
@@ -1050,7 +1225,13 @@ class VoteSystem(BasicSystem):
                     task.cancel()
 
     async def _handle_delete(self, broadcast_info: BroadcastInfo) -> None:
-        """处理取消投票（仅管理员）"""
+        """处理通过关键词触发的删除投票操作（仅管理员）。
+
+        Parameters
+        ----------
+        broadcast_info : BroadcastInfo
+            广播信息。
+        """
         # 获取进行中的投票
         pending_votes = self.vote_manager.get_all_pending_votes()
         if not pending_votes:
@@ -1094,20 +1275,20 @@ class VoteSystem(BasicSystem):
                 task.cancel()
 
     async def _monitor_vote(self, vote_id: str) -> None:
-        """监控投票超时
+        """监控投票超时，超时后自动结束并处理结果。
 
-        参数
+        Parameters
         ----------
         vote_id : str
-            投票ID
+            要监控的投票 ID。
 
-        说明
-        ----
-        赞成/反对票在投票发起/触发时已立即检查（check_and_finalize_vote），
-        本方法只负责监控投票超时。
+        Notes
+        -----
+        赞成/反对票在投票发起/触发时已由 ``check_and_finalize_vote`` 立即检查；
+        本方法只负责在投票到达超时时间后触发最终判定。
+        任务被取消时（投票提前结束），会静默忽略 ``asyncio.CancelledError``。
         """
         try:
-            import time
 
             vote = self.vote_manager.get_vote(vote_id)
             if not vote:
@@ -1195,12 +1376,14 @@ class VoteSystem(BasicSystem):
             await self._broadcast_to_all(msg)
 
     async def _get_eligible_voters(self) -> Set[str]:
-        """获取有投票资格的用户ID集合
+        """获取当前有投票资格的用户 QQ 号集合。
+
+        资格判定规则：玩家在线 **且** 已在 :class:`PlayerManager` 中绑定 QQ 账号。
 
         Returns
         -------
         Set[str]
-            有投票资格的用户ID集合
+            有投票资格的 QQ 号集合；获取失败时返回空集合。
         """
         eligible = set()
 
@@ -1248,7 +1431,6 @@ class VoteSystem(BasicSystem):
 
         except Exception as e:
             self.logger.error(f"[VoteSystem] 获取投票资格用户失败: {e}")
-            import traceback
             self.logger.error(f"[VoteSystem Debug] 异常堆栈:\n{traceback.format_exc()}")
             self.debug_log(f"§c[投票调试] 获取投票资格失败: {e}", to_server=True)
 
@@ -1354,7 +1536,14 @@ class VoteSystem(BasicSystem):
         return []
 
     async def _shutdown_server_callback(self) -> None:
-        """关闭服务器的回调函数"""
+        """关服投票通过后的回调：倒计时结束后关闭服务器。
+
+        Notes
+        -----
+        - 当在线玩家中存在无投票资格者，或同时还有其他进行中的投票时，
+          会在配置的基础倒计时之上叠加额外准备时间（``extra_countdown``）。
+        - 倒计时结束后调用 ``server.stop()`` 执行关闭。
+        """
         try:
             self.logger.info(f"[VoteSystem] 执行关闭服务器")
 
@@ -1399,7 +1588,7 @@ class VoteSystem(BasicSystem):
             要广播的消息
         """
         try:
-            from gugubot.utils.types import ProcessedInfo, Source
+            from gugubot.utils.types import ProcessedInfo
 
             # 获取当前服务器的标识符
             server_name = self.config.get_keys(
@@ -1435,7 +1624,8 @@ class VoteSystem(BasicSystem):
             self.logger.error(f"[VoteSystem] 广播消息失败: {e}")
 
     def extract_keyword_example(self, keywords: Optional[List[str]] = None, count: int = 2) -> str:
-        """提取关键词中的前两位作为例子，用于帮助消息显示
+        """提取关键词列表中的前若干项，用"或"连接后作为帮助消息的示例文本。
+
         Parameters
         ----------
         keywords : Optional[List[str]]

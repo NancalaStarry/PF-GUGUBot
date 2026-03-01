@@ -9,10 +9,11 @@
 - 投票类型注册器，允许动态扩展投票类型
 """
 
-import time
-from typing import Optional, Callable, Dict, Set, List, Awaitable
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+import time
+from typing import Awaitable, Callable, Dict, List, Optional, Set
+
 from mcdreforged.api.types import PluginServerInterface
 
 
@@ -62,7 +63,7 @@ class VoteTypeConfig:
     enabled: bool = True
 
     def __post_init__(self):
-        """初始化默认值"""
+        """初始化默认值。"""
         if self.start_keywords is None:
             self.start_keywords = []
         if self.consult_keywords is None:
@@ -81,7 +82,20 @@ class VoteTypeRegistry:
         self._keyword_map: Dict[str, str] = {}  # 关键词到投票类型的映射
 
     def register(self, config: VoteTypeConfig) -> bool:
-        """注册投票类型。若 config.enabled 为 False 则跳过注册并返回 False。"""
+        """注册投票类型。
+
+        若 ``config.enabled`` 为 ``False`` 或同类型已存在，则跳过注册。
+
+        Parameters
+        ----------
+        config : VoteTypeConfig
+            要注册的投票类型配置。
+
+        Returns
+        -------
+        bool
+            注册成功返回 ``True``；已禁用或已存在则返回 ``False``。
+        """
         if not config.enabled:
             return False
 
@@ -99,7 +113,18 @@ class VoteTypeRegistry:
         return True
 
     def unregister(self, vote_type: str) -> bool:
-        """注销投票类型"""
+        """注销投票类型，同时移除其所有关键词映射。
+
+        Parameters
+        ----------
+        vote_type : str
+            要注销的投票类型标识符。
+
+        Returns
+        -------
+        bool
+            注销成功返回 ``True``；类型不存在则返回 ``False``。
+        """
         if vote_type not in self._registry:
             return False
 
@@ -113,16 +138,17 @@ class VoteTypeRegistry:
         return True
 
     def get_config(self, vote_type: str) -> Optional[VoteTypeConfig]:
-        """获取投票类型配置
+        """获取投票类型配置。
 
         Parameters
         ----------
         vote_type : str
-            投票类型标识符
+            投票类型标识符。
+
         Returns
         -------
         VoteTypeConfig, optional
-            投票类型配置，如果未注册则返回None
+            对应的投票类型配置；未注册则返回 ``None``。
         """
 
         return self._registry.get(vote_type)
@@ -149,19 +175,42 @@ class VoteTypeRegistry:
         return config, is_consult
 
     def get_all_configs(self) -> Dict[str, VoteTypeConfig]:
-        """获取所有已注册的投票类型配置"""
+        """获取所有已注册的投票类型配置的浅拷贝。
+
+        Returns
+        -------
+        Dict[str, VoteTypeConfig]
+            以投票类型标识符为键的配置字典。
+        """
         return self._registry.copy()
 
     def is_registered(self, vote_type: str) -> bool:
-        """检查投票类型是否已注册"""
+        """检查投票类型是否已注册。
+
+        Parameters
+        ----------
+        vote_type : str
+            投票类型标识符。
+
+        Returns
+        -------
+        bool
+            已注册返回 ``True``，否则返回 ``False``。
+        """
         return vote_type in self._registry
 
     def get_all_keywords(self) -> list[str]:
-        """获取所有已注册的关键词"""
+        """获取所有已注册的关键词列表。
+
+        Returns
+        -------
+        list[str]
+            包含所有触发关键词（开始关键词与征求关键词）的列表。
+        """
         return list(self._keyword_map.keys())
 
     def clear(self):
-        """清空所有已注册的投票类型"""
+        """清空所有已注册的投票类型及其关键词映射。"""
         self._registry.clear()
         self._keyword_map.clear()
 
@@ -445,8 +494,12 @@ class VoteManager:
     """
 
     def __init__(self, server: PluginServerInterface):
-        """初始化投票管理器
+        """初始化投票管理器。
 
+        Parameters
+        ----------
+        server : PluginServerInterface
+            MCDR 服务器接口，用于获取日志记录器。
         """
         self.active_votes: Dict[str, Vote] = {}
         self.logger = server.logger
