@@ -294,7 +294,10 @@ class BridgeConnector(BasicConnector):
         source_list = processed_info.source.to_list() if processed_info.source else []
 
         message_data = {
-            "sender": processed_info.sender or "System",
+            "sender": processed_info.sender
+            or self.config.get_keys(
+                ["connector", "minecraft_bridge", "source_name"], "System"
+            ),
             "sender_id": processed_info.sender_id,
             "event_sub_type": processed_info.event_sub_type,
             "receiver": processed_info.receiver,
