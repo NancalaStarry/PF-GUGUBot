@@ -236,9 +236,7 @@ class ConnectorManager:
         failures: Dict[str, Exception] = {}
         tasks = []
 
-        for connector in self.connectors[
-            :
-        ]:  # iterate over a copy to avoid mutating the list
+        for connector in self.connectors[:]:  # iterate over a copy to avoid mutating the list
             task = asyncio.create_task(self.remove_connector(connector))
             tasks.append((connector, task))
 
