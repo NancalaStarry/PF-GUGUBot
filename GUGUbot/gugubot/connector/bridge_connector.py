@@ -271,9 +271,7 @@ class BridgeConnector(BasicConnector):
         except Exception as e:
             self.logger.error(f"{self.log_prefix} 处理桥接消息失败: {e}")
 
-    async def send_message(
-        self, processed_info: ProcessedInfo, *args, **kwargs
-    ) -> None:
+    async def send_message(self, processed_info: ProcessedInfo) -> None:
         """Serialize and send a message over the bridge."""
         if not self.enable:
             return
@@ -330,7 +328,7 @@ class BridgeConnector(BasicConnector):
         except Exception as e:
             self.logger.warning(f"{self.log_prefix} 断开连接时出错: {e}")
 
-    async def on_message(self, raw: Any) -> BroadcastInfo:
+    async def on_message(self, raw: Any) -> None:
         """Handle an incoming raw message via the parser."""
         if not self.enable:
             return None

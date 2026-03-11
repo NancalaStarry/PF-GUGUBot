@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from gugubot.config import BotConfig
 from gugubot.parser.basic_parser import BasicParser
-from gugubot.utils.types import BroadcastInfo, ProcessedInfo
+from gugubot.utils.types import ProcessedInfo
 
 
 class BasicConnector(ABC):
@@ -63,7 +63,7 @@ class BasicConnector(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def send_message(self, processed_info: ProcessedInfo, **kwargs) -> None:
+    async def send_message(self, processed_info: ProcessedInfo) -> None:
         """Send a message through the connector.
 
         Parameters
@@ -81,7 +81,7 @@ class BasicConnector(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def on_message(self, raw: Any) -> BroadcastInfo:
+    async def on_message(self, raw: Any) -> None:
         """Handle a raw incoming message.
 
         Typical responsibilities:

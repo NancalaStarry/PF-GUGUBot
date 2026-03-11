@@ -48,7 +48,7 @@ class TestConnector(BasicConnector):
         """Tear down the connection (no-op since MCDR manages the lifecycle)."""
         self.logger.info("TEST连接器已断开")
 
-    async def send_message(self, processed_info: ProcessedInfo, *args, **kwargs) -> None:
+    async def send_message(self, processed_info: ProcessedInfo) -> None:
         """Send a message by logging it to the console.
 
         Parameters

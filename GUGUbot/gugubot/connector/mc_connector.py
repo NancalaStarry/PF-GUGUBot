@@ -58,7 +58,7 @@ class MCConnector(BasicConnector):
         """Tear down the connection (no-op since MCDR manages the lifecycle)."""
         self.logger.info(f"{self.log_prefix} 已断开 ~")
 
-    async def send_message(self, processed_info: ProcessedInfo, **kwargs) -> None:
+    async def send_message(self, processed_info: ProcessedInfo) -> None:
         """Build and broadcast a message to the Minecraft server chat.
 
         Parameters
@@ -137,26 +137,22 @@ class MCConnector(BasicConnector):
             self.logger.error(f"{self.log_prefix} 发送消息失败: {error_msg}")
             raise
 
-    async def on_message(self, server: PluginServerInterface, info: Info) -> None:
+    async def on_message(self, raw: Any) -> None:
         """Handle an incoming Minecraft chat message.
 
         Parameters
         ----------
-        server : PluginServerInterface
-            MCDR plugin server interface.
-        info : Info
-            The received message information object.
+        raw : Info
+            The MCDR ``Info`` object for the received message.
         """
         try:
             if not self.enable:
                 return
 
-            is_player = info.is_player
-
-            if not is_player:
+            if not raw.is_player:
                 return
 
-            await self.parser(self).process_message(info, server=server)
+            await self.parser(self).process_message(raw, server=self.server)
 
         except Exception as e:
             self.logger.error(f"{self.log_prefix} 处理消息失败: {e}")

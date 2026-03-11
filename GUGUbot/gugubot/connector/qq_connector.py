@@ -160,7 +160,7 @@ class QQWebSocketConnector(BasicConnector):
         self.ws_client = WebSocketFactory.create_client(
             url=self.url,
             token=self.token,
-            on_message=self.on_message,
+            on_message=self._on_ws_message,
             on_open=self._on_open,
             on_error=self._on_error,
             on_close=self._on_close,
@@ -436,8 +436,19 @@ class QQWebSocketConnector(BasicConnector):
             )
             raise
 
-    def on_message(self, _, raw_message: str) -> None:
+    async def on_message(self, raw: Any) -> None:
+        """Handle a raw incoming message (base-class interface).
+
+        Delegates to :meth:`_on_ws_message` which contains the actual
+        processing logic shared with the WebSocket callback.
+        """
+        self._on_ws_message(None, raw)
+
+    def _on_ws_message(self, _, raw_message: str) -> None:
         """Dispatch an incoming WebSocket message.
+
+        This method is used as the WebSocket ``on_message`` callback and
+        is also called by :meth:`on_message`.
 
         Processing flow:
 
@@ -451,11 +462,6 @@ class QQWebSocketConnector(BasicConnector):
         ----------
         raw_message : str
             JSON-encoded message received from the WebSocket.
-
-        Notes
-        -----
-        WebSocket callbacks run in a separate thread; async work is
-        dispatched via ``server.schedule_task``.
         """
         if not self.enable:
             return
