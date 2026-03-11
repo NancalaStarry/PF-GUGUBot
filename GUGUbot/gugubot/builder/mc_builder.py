@@ -8,7 +8,7 @@ from mcdreforged.api.rtext import RAction, RColor, RText, RTextBase
 from packaging import version
 
 from gugubot.builder.basic_builder import BasicBuilder
-from gugubot.constant.qq_emoji_map import qq_emoji_map
+from gugubot.constant import qq_emoji_map
 from gugubot.utils.player_manager import PlayerManager
 
 
