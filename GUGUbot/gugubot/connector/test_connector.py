@@ -32,9 +32,9 @@ class TestConnector(BasicConnector):
         logger : logging.Logger, optional
             Logger instance.  Falls back to ``server.logger`` when omitted.
         """
-        super().__init__(source="test", config=config)
-        self.server = server
-        self.logger = logger or server.logger
+        super().__init__(
+            source="test", server=server, logger=logger or server.logger, config=config
+        )
         # Reuse show_message_in_console as the master toggle for TestConnector
         self.enable = config.get_keys(["GUGUBot", "show_message_in_console"], True)
         self.enable_send = self.enable

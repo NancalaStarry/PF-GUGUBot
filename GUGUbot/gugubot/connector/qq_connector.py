@@ -102,8 +102,9 @@ class Bot:
 class QQWebSocketConnector(BasicConnector):
     def __init__(self, server, config: Optional[BotConfig] = None):
         source_name = config.get_keys(["connector", "QQ", "source_name"], "QQ")
-        super().__init__(source=source_name, parser=QQParser, config=config)
-        self.server = server
+        super().__init__(
+            source=source_name, parser=QQParser, server=server, config=config
+        )
         self.ws_client = None
 
         connector_basic_name = self.server.tr("gugubot.connector.name")

@@ -41,11 +41,13 @@ class MCConnector(BasicConnector):
             ["connector", "minecraft", "source_name"], "Minecraft"
         )
         super().__init__(
-            source=source_name, parser=MCParser,
-            builder=McMessageBuilder, config=config,
+            source=source_name,
+            parser=MCParser,
+            builder=McMessageBuilder,
+            server=server,
+            logger=logger or server.logger,
+            config=config,
         )
-        self.server = server
-        self.logger = logger or server.logger
 
         connector_basic_name = self.server.tr("gugubot.connector.name")
         self.log_prefix = f"[{connector_basic_name}{self.source}]"

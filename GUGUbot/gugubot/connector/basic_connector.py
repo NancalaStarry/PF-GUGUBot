@@ -21,6 +21,11 @@ class BasicConnector(ABC):
     builder : Any
         Object responsible for building outgoing messages from internal
         message objects into the raw format required by the source.
+    server : Any
+        Back-reference to the MCDR server instance.
+    logger : Any
+        Logger instance.  May be overridden by ``ConnectorManager`` during
+        registration.
     """
 
     def __init__(
@@ -35,10 +40,11 @@ class BasicConnector(ABC):
         self.source: str = source
         self.parser: Optional[BasicParser] = parser
         self.builder: Any = builder
+        self.server: Any = server
         self.connector_manager: Any = (
             None  # Will be set when registered to ConnectorManager
         )
-        self.logger: Any = None  # Will be set when registered to ConnectorManager
+        self.logger: Any = logger
         self.config: BotConfig = config or {}
         self.enable: bool = self.config.get_keys(
             ["connector", self.source, "enable"], True

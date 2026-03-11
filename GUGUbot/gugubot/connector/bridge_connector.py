@@ -25,8 +25,9 @@ class BridgeConnector(BasicConnector):
         source_name = config.get_keys(
             ["connector", "minecraft_bridge", "source_name"], "Bridge"
         )
-        super().__init__(source=source_name, parser=MCParser, config=config)
-        self.server = server
+        super().__init__(
+            source=source_name, parser=MCParser, server=server, config=config
+        )
 
         connector_basic_name = self.server.tr("gugubot.connector.name")
         self.log_prefix = f"[{connector_basic_name}{self.source}]"
