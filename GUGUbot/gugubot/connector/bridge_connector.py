@@ -1,3 +1,5 @@
+"""Bridge connector implementation for cross-server communication between Minecraft servers."""
+
 import asyncio
 import json
 import time
@@ -126,7 +128,7 @@ class BridgeConnector(BasicConnector):
             thread_name=f"[GUGUBot]Bridge_{self._client_id}",
         )
 
-    def _on_client_connect(self, client: Dict, server: Any) -> None:
+    def _on_client_connect(self, client: Dict, _: Any) -> None:
         """Handle a new client connecting to the bridge server."""
         client_address = client.get("address") if client else "unknown"
         client_count = self.ws_server.get_client_count() if self.ws_server else 0
@@ -134,7 +136,7 @@ class BridgeConnector(BasicConnector):
             f"{self.log_prefix} 新客户端连接: {client_address} (总数: {client_count})"
         )
 
-    def _on_client_disconnect(self, client: Dict, server: Any) -> None:
+    def _on_client_disconnect(self, client: Dict, _: Any) -> None:
         """Handle a client disconnecting from the bridge server."""
         client_address = client.get("address") if client else "unknown"
         client_count = self.ws_server.get_client_count() if self.ws_server else 0
@@ -142,17 +144,17 @@ class BridgeConnector(BasicConnector):
             f"{self.log_prefix} 客户端断开: {client_address} (剩余: {client_count})"
         )
 
-    def _on_client_open(self, ws) -> None:
+    def _on_client_open(self, _: Any) -> None:
         """Handle the client WebSocket connection being established."""
         self.logger.info(f"{self.log_prefix} 连接成功 ~")
 
-    def _on_client_error(self, ws, error: Exception) -> None:
+    def _on_client_error(self, _: Any, error: Exception) -> None:
         """Handle a client WebSocket connection error."""
         self.logger.error(
             f"{self.log_prefix} 连接错误: {type(error).__name__} - {error}"
         )
 
-    def _on_client_close(self, ws, status_code: int, reason: str) -> None:
+    def _on_client_close(self, ws, _: int, reason: str) -> None:
         """Handle the client WebSocket connection closing; schedule reconnect."""
 
         # Ignore stale close events from previous connections
@@ -201,7 +203,7 @@ class BridgeConnector(BasicConnector):
                 daemon=True,
             ).start()
 
-    def _handle_server_message(self, client: Dict, server: Any, message: str) -> None:
+    def _handle_server_message(self, client: Dict, _: Any, message: str) -> None:
         """Process a message received on the server side and relay it."""
         try:
             message_data = json.loads(message) if isinstance(message, str) else message
@@ -221,7 +223,7 @@ class BridgeConnector(BasicConnector):
         except Exception as e:
             self.logger.error(f"{self.log_prefix} 消息处理失败: {e}")
 
-    def _handle_client_message(self, ws, message: str) -> None:
+    def _handle_client_message(self, _: Any, message: str) -> None:
         """Process a message received on the client side."""
         try:
             message_data = json.loads(message) if isinstance(message, str) else message

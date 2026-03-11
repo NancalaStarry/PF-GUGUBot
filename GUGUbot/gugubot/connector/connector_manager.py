@@ -1,3 +1,8 @@
+"""
+Manager for multiple connector instances.
+Provides registration, removal, and message broadcasting across connectors.
+"""
+
 import asyncio
 import logging
 import re
@@ -166,7 +171,9 @@ class ConnectorManager:
         # (e.g. brackets) don't break include/exclude filters.
         if include is not None:
             to_connectors = [
-                c for c in to_connectors if any(re.match(re.escape(p), c.source) for p in include)
+                c
+                for c in to_connectors
+                if any(re.match(re.escape(p), c.source) for p in include)
             ]
 
         if exclude is not None:
@@ -229,7 +236,9 @@ class ConnectorManager:
         failures: Dict[str, Exception] = {}
         tasks = []
 
-        for connector in self.connectors[:]:  # iterate over a copy; remove_connector mutates the list
+        for connector in self.connectors[
+            :
+        ]:  # iterate over a copy to avoid mutating the list
             task = asyncio.create_task(self.remove_connector(connector))
             tasks.append((connector, task))
 

@@ -1,8 +1,8 @@
+"""Connector for a Minecraft server via MCDR."""
+
 import logging
 import traceback
 from typing import Any, Optional
-
-from mcdreforged.api.types import Info, PluginServerInterface
 
 from gugubot.builder import McMessageBuilder
 from gugubot.config import BotConfig
@@ -81,10 +81,14 @@ class MCConnector(BasicConnector):
         source_id = processed_info.source_id
         sender = processed_info.sender
         sender_id = processed_info.sender_id
-        receiver = getattr(processed_info, 'receiver', None)
+        receiver = getattr(processed_info, "receiver", None)
 
-        use_chat_image = self.config.get_keys(["connector", "minecraft", "chat_image"], False)
-        use_image_previewer = self.config.get_keys(["connector", "minecraft", "image_previewer"], False)
+        use_chat_image = self.config.get_keys(
+            ["connector", "minecraft", "chat_image"], False
+        )
+        use_image_previewer = self.config.get_keys(
+            ["connector", "minecraft", "image_previewer"], False
+        )
 
         try:
             game_version = self.server.get_server_information().version or ""
@@ -93,7 +97,6 @@ class MCConnector(BasicConnector):
 
             bound_system = self.connector_manager.system_manager.get_system("bound")
             player_manager = getattr(bound_system, "player_manager", None)
-            is_admin = await player_manager.is_admin(sender_id) if player_manager else False
 
             # Retrieve the bot's QQ ID so @-mentions targeting the bot can be filtered
             bot_id = None
@@ -103,34 +106,53 @@ class MCConnector(BasicConnector):
 
             rtext_content = self.builder.array_to_rtext(
                 message,
-                low_game_version=is_low_version, chat_image=use_chat_image, image_previewer=use_image_previewer,
-                player_manager=player_manager, bot_id=bot_id
+                low_game_version=is_low_version,
+                chat_image=use_chat_image,
+                image_previewer=use_image_previewer,
+                player_manager=player_manager,
+                bot_id=bot_id,
             )
 
             if player_manager:
                 sender_player = player_manager.get_player(str(sender_id))
                 if sender_player:
                     # Prefer the first Java name, then Bedrock name, then display name
-                    sender = (sender_player.java_name[0] if sender_player.java_name
-                              else sender_player.bedrock_name[0] if sender_player.bedrock_name
-                    else sender_player.name) or sender
+                    sender = (
+                        sender_player.java_name[0]
+                        if sender_player.java_name
+                        else (
+                            sender_player.bedrock_name[0]
+                            if sender_player.bedrock_name
+                            else sender_player.name
+                        )
+                    ) or sender
 
                 if receiver:
                     receiver_player = player_manager.get_player(str(receiver))
                     if receiver_player:
-                        receiver = (receiver_player.java_name[0] if receiver_player.java_name
-                                    else receiver_player.bedrock_name[0] if receiver_player.bedrock_name
-                        else receiver_player.name) or receiver
+                        receiver = (
+                            receiver_player.java_name[0]
+                            if receiver_player.java_name
+                            else (
+                                receiver_player.bedrock_name[0]
+                                if receiver_player.bedrock_name
+                                else receiver_player.name
+                            )
+                        ) or receiver
 
-            custom_group_name = self.config.get_keys(["connector", "QQ", "permissions", "custom_group_name"], {})
+            custom_group_name = self.config.get_keys(
+                ["connector", "QQ", "permissions", "custom_group_name"], {}
+            )
             source = custom_group_name.get(source_id, source)
 
-            main_content = self.builder.build(rtext_content,
-                                              group_name=source,
-                                              group_id=source_id,
-                                              sender=sender,
-                                              sender_id=sender_id,
-                                              receiver=receiver)
+            main_content = self.builder.build(
+                rtext_content,
+                group_name=source,
+                group_id=source_id,
+                sender=sender,
+                sender_id=sender_id,
+                receiver=receiver,
+            )
 
             self.server.say(main_content)
 

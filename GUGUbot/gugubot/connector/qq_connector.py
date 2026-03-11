@@ -1,3 +1,5 @@
+"""QQ WebSocket connector."""
+
 import asyncio
 import json
 import random
@@ -32,6 +34,8 @@ def strip_minecraft_color_codes(text: str) -> str:
 
 
 class Bot:
+    """OneBot API client."""
+
     def __init__(self, send_message, max_wait_time: int = 9) -> None:
         self.send_message = send_message
         self.max_wait_time = max_wait_time if 0 < max_wait_time <= 9 else 9
@@ -41,6 +45,7 @@ class Bot:
 
     @staticmethod
     def format_request(action: str, params: dict = None):
+        """Format a request for the OneBot API."""
         if params is None:
             params = {}
         return {"action": action, "params": params, "echo": params.get("echo", "")}
@@ -100,6 +105,8 @@ class Bot:
 
 
 class QQWebSocketConnector(BasicConnector):
+    """QQ WebSocket connector."""
+
     def __init__(self, server, config: Optional[BotConfig] = None):
         source_name = config.get_keys(["connector", "QQ", "source_name"], "QQ")
         super().__init__(
@@ -432,9 +439,10 @@ class QQWebSocketConnector(BasicConnector):
             )
         except Exception as e:
             error_msg = str(e) + "\n" + traceback.format_exc()
-            self.logger.warning(
-                f"{self.log_prefix} {self.server.tr('gugubot.connector.QQ.error_close', error=error_msg)}"
+            error_close_template = self.server.tr(
+                "gugubot.connector.QQ.error_close", error=error_msg
             )
+            self.logger.warning(f"{self.log_prefix} {error_close_template}")
             raise
 
     async def on_message(self, raw: Any) -> None:

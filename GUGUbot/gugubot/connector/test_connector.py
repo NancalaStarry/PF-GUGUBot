@@ -1,3 +1,5 @@
+"""Test connector for debugging message broadcasts."""
+
 import logging
 from typing import Any, Optional
 
